@@ -20,6 +20,8 @@ function getTodayRange() {
   return { start, end };
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function ReadReportPage() {
   const { start, end } = getTodayRange();
   const todayReports = await prisma.content.findMany({
