@@ -1,5 +1,8 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { prisma } from "@/app/lib/prisma";
+import { hashReadReportAuth } from "@/app/lib/auth";
+import LoginForm from "./LoginForm";
 
 const MEMBERS = [
   "한준기",
@@ -9,6 +12,8 @@ const MEMBERS = [
   "권혁재",
   "이상혁",
 ] as const;
+
+const READ_REPORT_COOKIE = "read_report_auth";
 
 /** 오늘 00:00 ~ 23:59 (서버 로컬) */
 function getTodayRange() {
@@ -23,6 +28,17 @@ function getTodayRange() {
 export const dynamic = "force-dynamic";
 
 export default async function ReadReportPage() {
+  const cookieStore = await cookies();
+  const authCookie = cookieStore.get(READ_REPORT_COOKIE);
+  const expectedToken =
+    process.env.NEXT_PUBLIC_PW != null
+      ? hashReadReportAuth(process.env.NEXT_PUBLIC_PW)
+      : "";
+
+  if (!expectedToken || authCookie?.value !== expectedToken) {
+    return <LoginForm />;
+  }
+
   const { start, end } = getTodayRange();
   const todayReports = await prisma.content.findMany({
     where: {
