@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hashReadReportAuth, isReadReportPasswordValid } from "@/app/lib/auth";
 
 const COOKIE_NAME = "read_report_auth";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7일
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 1; // 1일
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!isReadReportPasswordValid(password)) {
       return NextResponse.json(
         { error: "비밀번호가 올바르지 않습니다." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "처리 중 오류가 발생했습니다." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

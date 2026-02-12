@@ -40,7 +40,7 @@ export default function LoginForm() {
           <h2 className="text-xl font-bold text-gray-900 text-center mb-1">
             보고 현황 보기
           </h2>
-          <p className="text-sm text-gray-500 text-center mb-6">
+          <p className="text-sm text-gray-400 text-center mb-6">
             비밀번호를 입력하세요
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,7 +55,7 @@ export default function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="비밀번호"
                 autoComplete="current-password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                 disabled={loading}
               />
             </div>
