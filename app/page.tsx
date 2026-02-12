@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import ReportHistoryModal from "@/app/components/ReportHistoryModal";
 
 export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMember, setSelectedMember] = useState("");
   const [reportContent, setReportContent] = useState("");
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const members = ["한준기", "박상원", "김나경", "강민석", "권혁재", "이상혁"];
 
@@ -68,12 +70,23 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 팀원 선택 */}
             <div>
-              <label
-                htmlFor="member"
-                className="block text-sm font-semibold text-gray-700 mb-2"
-              >
-                팀원 선택
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label
+                  htmlFor="member"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  팀원 선택
+                </label>
+                {selectedMember && (
+                  <button
+                    type="button"
+                    onClick={() => setHistoryModalOpen(true)}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors cursor-pointer"
+                  >
+                    이전 보고 내용 보러가기
+                  </button>
+                )}
+              </div>
               <select
                 id="member"
                 value={selectedMember}
@@ -127,6 +140,12 @@ export default function Home() {
           </form>
         </div>
       </div>
+
+      <ReportHistoryModal
+        username={selectedMember}
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+      />
     </div>
   );
 }
