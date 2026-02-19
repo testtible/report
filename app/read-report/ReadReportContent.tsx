@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 const MEMBERS = [
@@ -51,6 +52,46 @@ export default function ReadReportContent({
   reportsByMember,
 }: Props) {
   const dateKeys = getRecentDateKeys(10);
+  const [weekSummaryState, setWeekSummaryState] = useState<{
+    username: string;
+    loading: boolean;
+    refined: string | null;
+    error: string | null;
+  } | null>(null);
+
+  const fetchWeekSummary = async (username: string) => {
+    setWeekSummaryState({
+      username,
+      loading: true,
+      refined: null,
+      error: null,
+    });
+    try {
+      const res = await fetch(
+        `/api/auth/week-report?username=${encodeURIComponent(username)}`,
+        { credentials: "include" },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setWeekSummaryState((s) =>
+          s ? { ...s, loading: false, error: data.error ?? "요청 실패" } : s,
+        );
+        return;
+      }
+      setWeekSummaryState({
+        username,
+        loading: false,
+        refined: data.refined ?? "",
+        error: null,
+      });
+    } catch {
+      setWeekSummaryState((s) =>
+        s ? { ...s, loading: false, error: "네트워크 오류" } : s,
+      );
+    }
+  };
+
+  const closeWeekSummary = () => setWeekSummaryState(null);
 
   return (
     <div className="space-y-6">
@@ -130,10 +171,78 @@ export default function ReadReportContent({
               >
                 {displayText}
               </div>
+              <button
+                type="button"
+                onClick={() => fetchWeekSummary(username)}
+                disabled={
+                  weekSummaryState?.username === username &&
+                  weekSummaryState?.loading
+                }
+                className="mt-3 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-60"
+              >
+                {weekSummaryState?.username === username &&
+                weekSummaryState?.loading
+                  ? "요약 중..."
+                  : "주간 보고 AI 요약"}
+              </button>
             </div>
           );
         })}
       </div>
+
+      {/* 주간보고 AI 요약 모달 */}
+      {weekSummaryState && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeWeekSummary}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="font-semibold text-gray-900">
+                주간 보고 AI 요약 · {weekSummaryState.username}
+              </h3>
+              <button
+                type="button"
+                onClick={closeWeekSummary}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100"
+                aria-label="닫기"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {weekSummaryState.loading ? (
+                <p className="text-center text-gray-500">
+                  AI가 요약하고 있습니다...
+                </p>
+              ) : weekSummaryState.error ? (
+                <p className="text-center text-red-600">
+                  {weekSummaryState.error}
+                </p>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                  {weekSummaryState.refined ?? "내용 없음"}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

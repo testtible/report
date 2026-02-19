@@ -42,9 +42,38 @@ export default function ReportHistoryModal({
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
+    try {
+      const res = await fetch("/api/auth/member-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: authPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error ?? "비밀번호를 확인해주세요.");
+        setAuthLoading(false);
+        return;
+      }
+      setAuthorized(true);
+      setAuthPassword("");
+    } catch {
+      setAuthError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!isOpen || !username) return;
+    if (!isOpen || !username || !authorized) return;
     let cancelled = false;
     const run = async () => {
       const res = await fetch(
@@ -74,7 +103,7 @@ export default function ReportHistoryModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, username]);
+  }, [isOpen, username, authorized]);
 
   const selectedReport = useMemo(
     () => reports.find((r) => r.id === selectedId) ?? null,
@@ -118,7 +147,38 @@ export default function ReportHistoryModal({
           </button>
         </div>
 
-        {loading ? (
+        {!authorized ? (
+          <div className="flex-1 flex items-center justify-center px-6 py-8">
+            <form
+              onSubmit={handleAuthSubmit}
+              className="w-full max-w-sm space-y-4"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-800 mb-2 text-center">
+                  팀원 이력 조회 비밀번호를 입력하세요
+                </p>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="비밀번호"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                  disabled={authLoading}
+                />
+              </div>
+              {authError && (
+                <p className="text-sm text-red-600 text-center">{authError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 transition-colors"
+              >
+                {authLoading ? "확인 중..." : "이력 보기"}
+              </button>
+            </form>
+          </div>
+        ) : loading ? (
           <div className="flex-1 flex items-center justify-center py-12 text-gray-500">
             불러오는 중...
           </div>
