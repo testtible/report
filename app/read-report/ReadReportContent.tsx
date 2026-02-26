@@ -178,12 +178,12 @@ export default function ReadReportContent({
                   weekSummaryState?.username === username &&
                   weekSummaryState?.loading
                 }
-                className="mt-3 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-60"
+                className="mt-3 w-full rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-60 cursor-pointer"
               >
                 {weekSummaryState?.username === username &&
                 weekSummaryState?.loading
-                  ? "요약 중..."
-                  : "주간 보고 AI 요약"}
+                  ? "시간이 소요될 수 있습니다. 요약 중..."
+                  : "주간 보고 AI 요약 (최근 5일치)"}
               </button>
             </div>
           );
