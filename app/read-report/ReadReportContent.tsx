@@ -9,7 +9,7 @@ const MEMBERS = [
   "김나경",
   "강민석",
   "권혁재",
-  "이상혁",
+  "전승기",
 ] as const;
 
 function formatDateLabel(dateKey: string): string {
