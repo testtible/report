@@ -9,7 +9,7 @@ export default function Home() {
   const [reportContent, setReportContent] = useState("");
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
-  const members = ["한준기", "박상원", "김나경", "강민석", "권혁재", "이상혁"];
+  const members = ["한준기", "박상원", "김나경", "강민석", "권혁재", "전승기"];
 
   // 현재 날짜를 YYYY-MM-DD 형식으로 가져오기
   const currentDate = new Date().toISOString().split("T")[0];
