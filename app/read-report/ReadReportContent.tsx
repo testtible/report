@@ -52,6 +52,13 @@ export default function ReadReportContent({
   reportsByMember,
 }: Props) {
   const dateKeys = getRecentDateKeys(10);
+  const submittedReports = MEMBERS.map((username) => ({
+    username,
+    content: reportsByMember[username],
+  })).filter(
+    (report) =>
+      report.content !== undefined && report.content.trim().length > 0,
+  );
   const [weekSummaryState, setWeekSummaryState] = useState<{
     username: string;
     loading: boolean;
@@ -134,6 +141,43 @@ export default function ReadReportContent({
         </span>
         <span className="ml-2 text-gray-500">{selectedDate}</span>
       </p>
+
+      {/* 통합 보고 섹션 */}
+      <section className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">
+            오늘의 보고 리스트
+          </h2>
+          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+            제출 {submittedReports.length}명
+          </span>
+        </div>
+        <p className="mb-5 text-sm text-gray-600">
+          미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
+        </p>
+
+        {submittedReports.length === 0 ? (
+          <div className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+            아직 제출된 보고가 없습니다.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {submittedReports.map(({ username, content }) => (
+              <article
+                key={username}
+                className="rounded-xl border border-gray-200 bg-gray-50 p-4"
+              >
+                <p className="mb-2 text-sm font-semibold text-gray-900">
+                  {username}
+                </p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                  {content}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* 팀원별 보고 카드 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
