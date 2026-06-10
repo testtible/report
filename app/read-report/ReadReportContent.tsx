@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-const MEMBERS = [
-  "한준기",
-  "박상원",
-  "김나경",
-  "강민석",
-  "권혁재",
-  "전승기",
-] as const;
+import { getLeaveTypeColor } from "@/app/lib/leave";
+import { formatModifiedReportDate, type ModifiedReportItem } from "@/app/lib/modifiedReports";
+import { isLeaveContent, MEMBERS } from "@/app/lib/members";
 
 function formatDateLabel(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -45,19 +39,61 @@ function getRecentDateKeys(count: number): string[] {
 type Props = {
   selectedDate: string;
   reportsByMember: Record<string, string>;
+  scheduledLeaveByMember: Record<string, string | null>;
+  modifiedReports: ModifiedReportItem[];
 };
+
+function ReportStatusBadge({ content }: { content: string | undefined }) {
+  const hasReport = content !== undefined && content.trim().length > 0;
+
+  if (!hasReport) {
+    return (
+      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+        미제출
+      </span>
+    );
+  }
+
+  const trimmed = content.trim();
+  if (isLeaveContent(trimmed)) {
+    const colors = getLeaveTypeColor(trimmed);
+    return (
+      <span
+        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+      >
+        {trimmed}
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+      제출완료
+    </span>
+  );
+}
 
 export default function ReadReportContent({
   selectedDate,
   reportsByMember,
+  scheduledLeaveByMember,
+  modifiedReports,
 }: Props) {
   const dateKeys = getRecentDateKeys(10);
-  const submittedReports = MEMBERS.map((username) => ({
+  const allSubmittedReports = MEMBERS.map((username) => ({
     username,
     content: reportsByMember[username],
   })).filter(
     (report) =>
       report.content !== undefined && report.content.trim().length > 0,
+  );
+  const leaveMembersOnDate = allSubmittedReports.flatMap((report) => {
+    const trimmed = report.content.trim();
+    if (!isLeaveContent(trimmed)) return [];
+    return [{ username: report.username, type: trimmed }];
+  });
+  const submittedReports = allSubmittedReports.filter(
+    (report) => !isLeaveContent(report.content.trim()),
   );
   const [weekSummaryState, setWeekSummaryState] = useState<{
     username: string;
@@ -65,6 +101,8 @@ export default function ReadReportContent({
     refined: string | null;
     error: string | null;
   } | null>(null);
+  const [modifiedReportModal, setModifiedReportModal] =
+    useState<ModifiedReportItem | null>(null);
 
   const fetchWeekSummary = async (username: string) => {
     setWeekSummaryState({
@@ -156,7 +194,7 @@ export default function ReadReportContent({
           미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
         </p>
 
-        {submittedReports.length === 0 ? (
+        {submittedReports.length === 0 && leaveMembersOnDate.length === 0 ? (
           <div className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
             아직 제출된 보고가 없습니다.
           </div>
@@ -175,9 +213,80 @@ export default function ReadReportContent({
                 </p>
               </article>
             ))}
+
+            {leaveMembersOnDate.length > 0 && (
+              <div
+                className={`${submittedReports.length > 0 ? "pt-4 border-t border-gray-200" : ""}`}
+              >
+                <p className="mb-3 text-xs font-medium text-gray-500">
+                  출장 · 휴가
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {leaveMembersOnDate.map(({ username, type }) => {
+                    const colors = getLeaveTypeColor(type);
+                    return (
+                      <div
+                        key={username}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium text-gray-900">
+                          {username}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+                        >
+                          {type}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
+
+      {/* 보고 수정 리스트 */}
+      {modifiedReports.length > 0 && (
+        <section className="w-full rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">
+              보고 수정 리스트
+            </h2>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+              {modifiedReports.length}건
+            </span>
+          </div>
+          <p className="mb-5 text-sm text-gray-600">
+            오늘을 제외한 최근 평일 4일 이내에 수정된 보고입니다.
+          </p>
+          <div className="space-y-3">
+            {modifiedReports.map((item) => (
+              <div
+                key={`${item.username}-${item.reportDate}`}
+                className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {item.username}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {formatModifiedReportDate(item.reportDate)} 보고 수정
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModifiedReportModal(item)}
+                  className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 cursor-pointer"
+                >
+                  수정 내용 보러가기
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 팀원별 보고 카드 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -195,16 +304,7 @@ export default function ReadReportContent({
                 <span className="text-lg font-semibold text-gray-900">
                   {username}
                 </span>
-                {!hasReport && (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                    미제출
-                  </span>
-                )}
-                {hasReport && (
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                    제출완료
-                  </span>
-                )}
+                <ReportStatusBadge content={content} />
               </div>
               <div
                 className={`min-h-[120px] rounded-xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
@@ -215,6 +315,11 @@ export default function ReadReportContent({
               >
                 {displayText}
               </div>
+              {scheduledLeaveByMember[username] && (
+                <p className="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 leading-relaxed">
+                  {scheduledLeaveByMember[username]}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => fetchWeekSummary(username)}
@@ -233,6 +338,63 @@ export default function ReadReportContent({
           );
         })}
       </div>
+
+      {/* 수정 내용 모달 */}
+      {modifiedReportModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setModifiedReportModal(null)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h3 className="font-semibold text-gray-900">
+                수정 보고 · {modifiedReportModal.username}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModifiedReportModal(null)}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 cursor-pointer"
+                aria-label="닫기"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                <p className="text-xs font-medium text-amber-700 mb-1">
+                  보고 날짜
+                </p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {formatModifiedReportDate(modifiedReportModal.reportDate)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">
+                  수정 내용
+                </p>
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
+                  {modifiedReportModal.content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 주간보고 AI 요약 모달 */}
       {weekSummaryState && (

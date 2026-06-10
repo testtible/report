@@ -1,30 +1,20 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/prisma";
 import { hashReadReportAuth } from "@/app/lib/auth";
+import { getDateRange, getTodayKey, isValidDateKey } from "@/app/lib/dates";
+import {
+  buildUpcomingLeaveByMember,
+  getLeaveSelectableBounds,
+} from "@/app/lib/leave";
+import {
+  buildModifiedReportList,
+  getPastEditableDateRange,
+  type ModifiedReportItem,
+} from "@/app/lib/modifiedReports";
 import LoginForm from "./LoginForm";
 import ReadReportContent from "./ReadReportContent";
 
 const READ_REPORT_COOKIE = "read_report_auth";
-
-function getTodayKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** 주어진 YYYY-MM-DD의 00:00 ~ 23:59 (서버 로컬) */
-function getDateRange(dateKey: string): { start: Date; end: Date } {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const start = new Date(y, m - 1, d, 0, 0, 0, 0);
-  const end = new Date(y, m - 1, d, 23, 59, 59, 999);
-  return { start, end };
-}
-
-function isValidDateKey(key: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(key);
-}
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +54,44 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
     }
   }
 
+  const { min, max } = getLeaveSelectableBounds();
+  const monthRangeStart = getDateRange(min).start;
+  const monthRangeEnd = getDateRange(max).end;
+  const scheduledLeaveReports = await prisma.content.findMany({
+    where: {
+      created_at: { gte: monthRangeStart, lte: monthRangeEnd },
+      content: { in: ["출장", "휴가"] },
+    },
+    orderBy: { created_at: "asc" },
+    select: { username: true, created_at: true, content: true },
+  });
+  const scheduledLeaveByMember =
+    buildUpcomingLeaveByMember(scheduledLeaveReports);
+
+  const pastRange = getPastEditableDateRange();
+  const pastReports = await prisma.$queryRaw<
+    {
+      username: string;
+      created_at: Date;
+      updated_at: Date;
+      content: string | null;
+    }[]
+  >`
+    SELECT username, created_at, updated_at, content
+    FROM content
+    WHERE created_at >= ${pastRange.start} AND created_at <= ${pastRange.end}
+  `;
+  const modifiedReports: ModifiedReportItem[] =
+    buildModifiedReportList(pastReports);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <ReadReportContent
           selectedDate={selectedDate}
           reportsByMember={reportsByMember}
+          scheduledLeaveByMember={scheduledLeaveByMember}
+          modifiedReports={modifiedReports}
         />
       </div>
     </div>

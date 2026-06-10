@@ -2,6 +2,9 @@
   "name": "aerix-report",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -17,6 +20,7 @@
     "pg": "^8.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "supabase": "^2.95.0",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
