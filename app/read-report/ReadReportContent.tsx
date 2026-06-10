@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import ReportAttachmentLink from "@/app/components/ReportAttachmentLink";
+import type { MemberReport } from "@/app/lib/attachments";
 import { getLeaveTypeColor } from "@/app/lib/leave";
 import { formatModifiedReportDate, type ModifiedReportItem } from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
@@ -38,7 +40,7 @@ function getRecentDateKeys(count: number): string[] {
 
 type Props = {
   selectedDate: string;
-  reportsByMember: Record<string, string>;
+  reportsByMember: Record<string, MemberReport>;
   scheduledLeaveByMember: Record<string, string | null>;
   modifiedReports: ModifiedReportItem[];
 };
@@ -82,18 +84,17 @@ export default function ReadReportContent({
   const dateKeys = getRecentDateKeys(10);
   const allSubmittedReports = MEMBERS.map((username) => ({
     username,
-    content: reportsByMember[username],
+    report: reportsByMember[username],
   })).filter(
-    (report) =>
-      report.content !== undefined && report.content.trim().length > 0,
+    ({ report }) => report !== undefined && report.content.trim().length > 0,
   );
-  const leaveMembersOnDate = allSubmittedReports.flatMap((report) => {
+  const leaveMembersOnDate = allSubmittedReports.flatMap(({ username, report }) => {
     const trimmed = report.content.trim();
     if (!isLeaveContent(trimmed)) return [];
-    return [{ username: report.username, type: trimmed }];
+    return [{ username, type: trimmed }];
   });
   const submittedReports = allSubmittedReports.filter(
-    (report) => !isLeaveContent(report.content.trim()),
+    ({ report }) => !isLeaveContent(report.content.trim()),
   );
   const [weekSummaryState, setWeekSummaryState] = useState<{
     username: string;
@@ -200,7 +201,7 @@ export default function ReadReportContent({
           </div>
         ) : (
           <div className="space-y-4">
-            {submittedReports.map(({ username, content }) => (
+            {submittedReports.map(({ username, report }) => (
               <article
                 key={username}
                 className="rounded-xl border border-gray-200 bg-gray-50 p-4"
@@ -209,8 +210,17 @@ export default function ReadReportContent({
                   {username}
                 </p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
-                  {content}
+                  {report.content}
                 </p>
+                {report.attachmentName && (
+                  <div className="mt-3">
+                    <ReportAttachmentLink
+                      reportId={report.id}
+                      fileName={report.attachmentName}
+                      fileSize={report.attachmentSize}
+                    />
+                  </div>
+                )}
               </article>
             ))}
 
@@ -291,9 +301,9 @@ export default function ReadReportContent({
       {/* 팀원별 보고 카드 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {MEMBERS.map((username) => {
-          const content = reportsByMember[username];
-          const hasReport = content !== undefined;
-          const displayText = hasReport ? content : "보고되지 않음";
+          const report = reportsByMember[username];
+          const hasReport = report !== undefined;
+          const displayText = hasReport ? report.content : "보고되지 않음";
 
           return (
             <div
@@ -304,7 +314,7 @@ export default function ReadReportContent({
                 <span className="text-lg font-semibold text-gray-900">
                   {username}
                 </span>
-                <ReportStatusBadge content={content} />
+                <ReportStatusBadge content={report?.content} />
               </div>
               <div
                 className={`min-h-[120px] rounded-xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
@@ -315,6 +325,16 @@ export default function ReadReportContent({
               >
                 {displayText}
               </div>
+              {report?.attachmentName && (
+                <div className="mt-3">
+                  <ReportAttachmentLink
+                    reportId={report.id}
+                    fileName={report.attachmentName}
+                    fileSize={report.attachmentSize}
+                    compact
+                  />
+                </div>
+              )}
               {scheduledLeaveByMember[username] && (
                 <p className="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 leading-relaxed">
                   {scheduledLeaveByMember[username]}

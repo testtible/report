@@ -6,6 +6,7 @@ import {
   buildUpcomingLeaveByMember,
   getLeaveSelectableBounds,
 } from "@/app/lib/leave";
+import type { MemberReport } from "@/app/lib/attachments";
 import {
   buildModifiedReportList,
   getPastEditableDateRange,
@@ -40,17 +41,30 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
     dateParam && isValidDateKey(dateParam) ? dateParam : getTodayKey();
 
   const { start, end } = getDateRange(selectedDate);
-  const reports = await prisma.content.findMany({
-    where: {
-      created_at: { gte: start, lte: end },
-    },
-    orderBy: { created_at: "desc" },
-  });
+  const reports = await prisma.$queryRaw<
+    {
+      id: bigint;
+      username: string;
+      content: string | null;
+      attachment_name: string | null;
+      attachment_size: number | null;
+    }[]
+  >`
+    SELECT id, username, content, attachment_name, attachment_size
+    FROM content
+    WHERE created_at >= ${start} AND created_at <= ${end}
+    ORDER BY created_at DESC
+  `;
 
-  const reportsByMember: Record<string, string> = {};
+  const reportsByMember: Record<string, MemberReport> = {};
   for (const r of reports) {
     if (!(r.username in reportsByMember)) {
-      reportsByMember[r.username] = r.content ?? "";
+      reportsByMember[r.username] = {
+        id: r.id.toString(),
+        content: r.content ?? "",
+        attachmentName: r.attachment_name,
+        attachmentSize: r.attachment_size,
+      };
     }
   }
 
