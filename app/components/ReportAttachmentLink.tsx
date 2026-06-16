@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatFileSize } from "@/app/lib/attachments";
 
 type Props = {
@@ -7,12 +8,27 @@ type Props = {
   compact?: boolean;
 };
 
+const IMAGE_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".bmp",
+];
+
 export default function ReportAttachmentLink({
   reportId,
   fileName,
   fileSize,
   compact = false,
 }: Props) {
+  const [showPreview, setShowPreview] = useState(false);
+  const isImage = IMAGE_EXTENSIONS.some((ext) =>
+    fileName.toLowerCase().endsWith(ext),
+  );
+
   return (
     <div
       className={`flex items-center gap-2 rounded-lg border border-gray-200 bg-white ${
@@ -42,18 +58,48 @@ export default function ReportAttachmentLink({
           {fileName}
         </p>
         {fileSize != null && fileSize > 0 && (
-          <p className="text-[10px] text-gray-500">{formatFileSize(fileSize)}</p>
+          <p className="text-[10px] text-gray-500">
+            {formatFileSize(fileSize)}
+          </p>
         )}
       </div>
-      <a
-        href={`/api/report/attachment?id=${reportId}`}
-        download={fileName}
-        className={`shrink-0 rounded-md bg-indigo-600 font-medium text-white transition-colors hover:bg-indigo-700 ${
-          compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1 text-xs"
-        }`}
-      >
-        다운로드
-      </a>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {isImage && (
+          <div
+            className="relative"
+            onMouseEnter={() => setShowPreview(true)}
+            onMouseLeave={() => setShowPreview(false)}
+          >
+            <div
+              className={`cursor-default rounded-md border border-indigo-200 bg-indigo-50 font-medium text-indigo-700 transition-colors hover:bg-indigo-100 ${
+                compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1 text-xs"
+              }`}
+            >
+              미리보기
+            </div>
+            {showPreview && (
+              <div className="absolute bottom-full right-0 pb-2 z-50">
+                <div className="rounded-lg border border-gray-200 bg-white p-1 shadow-2xl transition-all duration-200 ease-out scale-100 opacity-100">
+                  <img
+                    src={`/api/report/attachment?id=${reportId}&inline=true`}
+                    alt="미리보기"
+                    className="max-h-192 max-w-[960px] rounded object-contain bg-gray-50"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <a
+          href={`/api/report/attachment?id=${reportId}`}
+          download={fileName}
+          className={`block rounded-md bg-indigo-600 font-medium text-white transition-colors hover:bg-indigo-700 ${
+            compact ? "px-2 py-1 text-[10px]" : "px-2.5 py-1 text-xs"
+          }`}
+        >
+          다운로드
+        </a>
+      </div>
     </div>
   );
 }

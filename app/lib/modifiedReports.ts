@@ -9,6 +9,7 @@ import { LEAVE_TYPES } from "@/app/lib/members";
 const MODIFIED_THRESHOLD_MS = 60_000;
 
 export type ModifiedReportItem = {
+  id: string;
   username: string;
   reportDate: string;
   content: string;
@@ -17,6 +18,7 @@ export type ModifiedReportItem = {
 
 export function buildModifiedReportList(
   reports: {
+    id: bigint;
     username: string;
     created_at: Date;
     updated_at: Date;
@@ -47,6 +49,7 @@ export function buildModifiedReportList(
     if (!isModified) continue;
 
     items.push({
+      id: report.id.toString(),
       username: report.username,
       reportDate,
       content,

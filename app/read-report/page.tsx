@@ -85,13 +85,14 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
   const pastRange = getPastEditableDateRange();
   const pastReports = await prisma.$queryRaw<
     {
+      id: bigint;
       username: string;
       created_at: Date;
       updated_at: Date;
       content: string | null;
     }[]
   >`
-    SELECT username, created_at, updated_at, content
+    SELECT id, username, created_at, updated_at, content
     FROM content
     WHERE created_at >= ${pastRange.start} AND created_at <= ${pastRange.end}
   `;

@@ -36,11 +36,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const inline = request.nextUrl.searchParams.get("inline") === "true";
   const encodedName = encodeURIComponent(report.attachment_name);
   return new NextResponse(new Uint8Array(report.attachment_data), {
     headers: {
       "Content-Type": report.attachment_mime_type ?? "application/octet-stream",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodedName}`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodedName}`,
       "Content-Length": String(report.attachment_data.length),
     },
   });

@@ -82,6 +82,7 @@ export default function ReadReportContent({
   modifiedReports,
 }: Props) {
   const dateKeys = getRecentDateKeys(10);
+  const [currentModifiedReports, setCurrentModifiedReports] = useState(modifiedReports);
   const allSubmittedReports = MEMBERS.map((username) => ({
     username,
     report: reportsByMember[username],
@@ -138,6 +139,26 @@ export default function ReadReportContent({
   };
 
   const closeWeekSummary = () => setWeekSummaryState(null);
+
+  const confirmModification = async (id: string) => {
+    if (!confirm("이 보고서의 수정을 확인 완료 처리하시겠습니까?\n리스트에서 제외됩니다.")) return;
+    
+    try {
+      const res = await fetch("/api/report/confirm-modification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        setCurrentModifiedReports((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        const data = await res.json();
+        alert(data.error ?? "처리에 실패했습니다.");
+      }
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -258,21 +279,21 @@ export default function ReadReportContent({
       </section>
 
       {/* 보고 수정 리스트 */}
-      {modifiedReports.length > 0 && (
+      {currentModifiedReports.length > 0 && (
         <section className="w-full rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-gray-900">
               보고 수정 리스트
             </h2>
             <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-              {modifiedReports.length}건
+              {currentModifiedReports.length}건
             </span>
           </div>
           <p className="mb-5 text-sm text-gray-600">
             오늘을 제외한 최근 평일 4일 이내에 수정된 보고입니다.
           </p>
           <div className="space-y-3">
-            {modifiedReports.map((item) => (
+            {currentModifiedReports.map((item) => (
               <div
                 key={`${item.username}-${item.reportDate}`}
                 className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
@@ -285,13 +306,22 @@ export default function ReadReportContent({
                     {formatModifiedReportDate(item.reportDate)} 보고 수정
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setModifiedReportModal(item)}
-                  className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 cursor-pointer"
-                >
-                  수정 내용 보러가기
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModifiedReportModal(item)}
+                    className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 cursor-pointer"
+                  >
+                    수정 내용 보러가기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => confirmModification(item.id)}
+                    className="shrink-0 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 cursor-pointer"
+                  >
+                    확인 완료
+                  </button>
+                </div>
               </div>
             ))}
           </div>
