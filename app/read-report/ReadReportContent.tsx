@@ -105,6 +105,25 @@ export default function ReadReportContent({
   } | null>(null);
   const [modifiedReportModal, setModifiedReportModal] =
     useState<ModifiedReportItem | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyAll = async () => {
+    if (submittedReports.length === 0) {
+      alert("복사할 제출 내역이 없습니다.");
+      return;
+    }
+    const textToCopy = submittedReports
+      .map(({ username, report }) => `${username}\n${report.content}`)
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy: ", err);
+      alert("복사에 실패했습니다.");
+    }
+  };
 
   const fetchWeekSummary = async (username: string) => {
     setWeekSummaryState({
@@ -205,12 +224,62 @@ export default function ReadReportContent({
       {/* 통합 보고 섹션 */}
       <section className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-gray-900">
-            오늘의 보고 리스트
-          </h2>
-          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
-            제출 {submittedReports.length}명
-          </span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900">
+              오늘의 보고 리스트
+            </h2>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+              제출 {submittedReports.length}명
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyAll}
+            disabled={submittedReports.length === 0}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
+              submittedReports.length === 0
+                ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                : isCopied
+                ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm cursor-pointer"
+                : "bg-white border-indigo-600 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm active:bg-indigo-100 cursor-pointer"
+            }`}
+          >
+            {isCopied ? (
+              <>
+                <svg
+                  className="w-3.5 h-3.5 text-emerald-600 animate-pulse"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                복사 완료!
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-3.5 h-3.5 text-indigo-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 3h6"
+                  />
+                </svg>
+                전체 내역 복사
+              </>
+            )}
+          </button>
         </div>
         <p className="mb-5 text-sm text-gray-600">
           미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
