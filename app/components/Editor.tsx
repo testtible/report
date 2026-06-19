@@ -8,8 +8,7 @@ const ReactQuill = dynamic(() => import("react-quill"), {
   loading: () => (
     <div className="w-full h-[340px] border border-gray-300 rounded-lg bg-gray-50 animate-pulse" />
   ),
-});
-
+}); //
 type Props = {
   value: string;
   onChange: (content: string) => void;
@@ -17,7 +16,12 @@ type Props = {
   disabled?: boolean;
 };
 
-export default function Editor({ value, onChange, placeholder, disabled }: Props) {
+export default function Editor({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: Props) {
   const modules = {
     toolbar: [
       [{ header: [1, 2, false] }],
