@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { hashMemberHistoryAuth, hashReadReportAuth } from "@/app/lib/auth";
+import { getAiApiUrl, getAiModel } from "@/app/lib/ai";
 
-const MEMBER_HISTORY_COOKIE = "member_history_auth";
-const READ_REPORT_COOKIE = "read_report_auth";
-const AI_API_URL = "http://218.38.151.64:11434/api/generate";
+export const maxDuration = 60;
 
 function formatDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -15,11 +13,15 @@ function formatDateKey(d: Date): string {
 
 async function refineReport(content: string): Promise<string> {
   try {
-    const response = await fetch(AI_API_URL, {
+    const response = await fetch(getAiApiUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "mistral",
+        model: getAiModel(),
+        options: {
+          num_ctx: 8192,
+          temperature: 0.3,
+        },
         prompt: `
         ### Role
         너는 한국어 전용 비즈니스 보고서 요약 전문가이다.

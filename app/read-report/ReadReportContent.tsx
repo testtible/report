@@ -7,6 +7,8 @@ import type { MemberReport } from "@/app/lib/attachments";
 import { getLeaveTypeColor } from "@/app/lib/leave";
 import { formatModifiedReportDate, type ModifiedReportItem } from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
+import ReportAiChatModal from "@/app/components/ReportAiChatModal";
+import ProjectSummaryModal from "@/app/components/ProjectSummaryModal";
 
 function formatDateLabel(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -106,6 +108,8 @@ export default function ReadReportContent({
   const [modifiedReportModal, setModifiedReportModal] =
     useState<ModifiedReportItem | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [aiChatModalOpen, setAiChatModalOpen] = useState(false);
+  const [projectSummaryModalOpen, setProjectSummaryModalOpen] = useState(false);
 
   const handleCopyAll = async () => {
     if (submittedReports.length === 0) {
@@ -188,6 +192,29 @@ export default function ReadReportContent({
             날짜를 클릭하면 해당 날짜의 팀원별 보고를 볼 수 있습니다.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setAiChatModalOpen(true)}
+          className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer shrink-0"
+        >
+          <svg
+            className="w-4 h-4 text-amber-300 animate-pulse"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+          <span>AI에게 질문하기</span>
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white">
+            사내 LLM
+          </span>
+        </button>
       </div>
 
       {/* 날짜 선택 스트립 */}
@@ -232,10 +259,38 @@ export default function ReadReportContent({
               제출 {submittedReports.length}명
             </span>
           </div>
-          <button
-            type="button"
-            onClick={handleCopyAll}
-            disabled={submittedReports.length === 0}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setProjectSummaryModalOpen(true)}
+              disabled={submittedReports.length === 0}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 border cursor-pointer ${
+                submittedReports.length === 0
+                  ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 hover:shadow-xs active:bg-purple-200"
+              }`}
+              title="오늘 보고를 프로젝트 및 업무 단위로 분류하여 취합합니다"
+            >
+              <svg
+                className="w-3.5 h-3.5 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              <span>AI 프로젝트별 정리</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyAll}
+              disabled={submittedReports.length === 0}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
               submittedReports.length === 0
                 ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
@@ -280,6 +335,7 @@ export default function ReadReportContent({
               </>
             )}
           </button>
+          </div>
         </div>
         <p className="mb-5 text-sm text-gray-600">
           미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
@@ -568,6 +624,23 @@ export default function ReadReportContent({
           </div>
         </div>
       )}
+
+      {/* 보고서 AI 질의응답 모달 */}
+      <ReportAiChatModal
+        isOpen={aiChatModalOpen}
+        onClose={() => setAiChatModalOpen(false)}
+      />
+
+      {/* 프로젝트별 보고 취합 모달 */}
+      <ProjectSummaryModal
+        isOpen={projectSummaryModalOpen}
+        onClose={() => setProjectSummaryModalOpen(false)}
+        selectedDate={selectedDate}
+        reports={submittedReports.map((r) => ({
+          username: r.username,
+          content: r.report.content,
+        }))}
+      />
     </div>
   );
 }
