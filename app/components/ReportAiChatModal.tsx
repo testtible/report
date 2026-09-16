@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import MarkdownView from "@/app/components/MarkdownView";
 
 type Props = {
   isOpen: boolean;
@@ -21,9 +22,11 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [loadingStage, setLoadingStage] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const answerContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 모달이 열릴 때 input에 포커스
@@ -39,10 +42,13 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
     }
   }, [isOpen]);
 
-  // 스트리밍 중 textarea 스크롤 최하단 유지
+  // 스트리밍 중 스크롤 최하단 유지
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+    if (answerContainerRef.current) {
+      answerContainerRef.current.scrollTop = answerContainerRef.current.scrollHeight;
     }
   }, [answer]);
 
@@ -295,21 +301,48 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
             </div>
           )}
 
-          {/* 실시간 타이핑되는 답변 영역 (textarea) */}
+          {/* 실시간 타이핑되는 답변 영역 */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="ai-answer-textarea"
-                className="text-xs font-semibold text-gray-700 flex items-center gap-1.5"
-              >
-                <span>AI 분석 답변</span>
-                {isLoading && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-normal text-indigo-600">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-600 animate-ping" />
-                    실시간 생성 중...
-                  </span>
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                  <span>AI 분석 답변</span>
+                  {isLoading && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-normal text-indigo-600">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-600 animate-ping" />
+                      실시간 생성 중...
+                    </span>
+                  )}
+                </label>
+
+                {answer && (
+                  <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-100 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("formatted")}
+                      className={`rounded px-2 py-0.5 transition-all cursor-pointer ${
+                        viewMode === "formatted"
+                          ? "bg-white text-indigo-700 shadow-xs font-semibold"
+                          : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      ✨ 서식
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("raw")}
+                      className={`rounded px-2 py-0.5 transition-all cursor-pointer ${
+                        viewMode === "raw"
+                          ? "bg-white text-indigo-700 shadow-xs font-semibold"
+                          : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      📄 원문
+                    </button>
+                  </div>
                 )}
-              </label>
+              </div>
+
               {answer && (
                 <button
                   type="button"
@@ -355,24 +388,33 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
               )}
             </div>
 
-            <textarea
-              id="ai-answer-textarea"
-              ref={textareaRef}
-              readOnly
-              rows={12}
-              value={
-                answer
-                  ? answer
-                  : isLoading
-                  ? loadingStage || "보고서 데이터를 분석하고 있습니다..."
-                  : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
-              }
-              className={`w-full rounded-xl border p-4 text-sm font-mono leading-relaxed outline-none transition-all resize-none ${
-                answer
-                  ? "bg-slate-50 border-gray-300 text-gray-900"
-                  : "bg-gray-50 border-gray-200 text-gray-400 italic"
-              }`}
-            />
+            {viewMode === "formatted" && answer ? (
+              <div
+                ref={answerContainerRef}
+                className="h-72 w-full overflow-y-auto rounded-xl border border-indigo-100 bg-slate-50/50 p-4 text-sm leading-relaxed text-gray-800 shadow-inner"
+              >
+                <MarkdownView content={answer} />
+              </div>
+            ) : (
+              <textarea
+                id="ai-answer-textarea"
+                ref={textareaRef}
+                readOnly
+                rows={11}
+                value={
+                  answer
+                    ? answer
+                    : isLoading
+                    ? loadingStage || "보고서 데이터를 분석하고 있습니다..."
+                    : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
+                }
+                className={`w-full rounded-xl border p-4 text-sm font-mono leading-relaxed outline-none transition-all resize-none ${
+                  answer
+                    ? "bg-slate-50 border-gray-300 text-gray-900"
+                    : "bg-gray-50 border-gray-200 text-gray-400 italic"
+                }`}
+              />
+            )}
           </div>
         </div>
 

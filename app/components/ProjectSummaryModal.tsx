@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import MarkdownView from "@/app/components/MarkdownView";
 
 type Props = {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function ProjectSummaryModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
 
   const fetchProjectSummary = useCallback(async () => {
     if (reports.length === 0) {
@@ -182,10 +184,47 @@ export default function ProjectSummaryModal({
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-xl bg-slate-50 border border-gray-200 p-5 font-mono text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
-                {summary}
+            <div className="space-y-3">
+              {/* 보기 모드 선택 탭 */}
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                <span className="text-xs text-gray-500 font-medium">
+                  {viewMode === "formatted" ? "✨ 마크다운 서식으로 정리된 화면입니다" : "📄 복사용 일반 텍스트 화면입니다"}
+                </span>
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-100 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("formatted")}
+                    className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                      viewMode === "formatted"
+                        ? "bg-white text-purple-700 shadow-xs font-semibold"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    ✨ 서식 보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("raw")}
+                    className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                      viewMode === "raw"
+                        ? "bg-white text-purple-700 shadow-xs font-semibold"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    📄 텍스트 원문
+                  </button>
+                </div>
               </div>
+
+              {viewMode === "formatted" ? (
+                <div className="rounded-xl bg-white border border-purple-100 p-5 shadow-xs text-sm leading-relaxed text-gray-800">
+                  <MarkdownView content={summary} />
+                </div>
+              ) : (
+                <div className="rounded-xl bg-slate-50 border border-gray-200 p-5 font-mono text-xs leading-relaxed text-gray-800 whitespace-pre-wrap">
+                  {summary}
+                </div>
+              )}
             </div>
           )}
         </div>

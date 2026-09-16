@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import LeaveScheduleModal from "@/app/components/LeaveScheduleModal";
 import ReportHistoryModal from "@/app/components/ReportHistoryModal";
+import MarkdownView from "@/app/components/MarkdownView";
 import {
   formatFileSize,
   MAX_ATTACHMENT_SIZE_LABEL,
@@ -35,9 +36,53 @@ export default function Home() {
   >(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
   const [isRefiningAi, setIsRefiningAi] = useState(false);
-  const [prevReportContent, setPrevReportContent] = useState<string | null>(null);
+  const [prevReportContent, setPrevReportContent] = useState<string | null>(
+    null,
+  );
+  const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editableDates = getEditableDateKeys();
+
+  const insertMarkdown = (prefix: string, suffix: string = "") => {
+    const textarea = contentTextareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = reportContent.substring(start, end);
+    const replacement = selected
+      ? `${prefix}${selected}${suffix}`
+      : `${prefix}${suffix}`;
+    const next =
+      reportContent.substring(0, start) +
+      replacement +
+      reportContent.substring(end);
+    setReportContent(next);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = selected
+        ? start + replacement.length
+        : start + prefix.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  const insertTemplate = () => {
+    const template = `### [진행 업무]\n- [x] 주요 완료 작업\n- [ ] 진행 중인 작업\n\n### [이슈 및 특이사항]\n- 특이사항 및 협의 필요 내용 없음\n\n### [내일 예정 사항]\n- 내일 진행할 작업 계획`;
+    if (reportContent.trim()) {
+      if (
+        !confirm(
+          "기존 작성 내용 아래에 일일 보고서 추천 양식을 추가하시겠습니까?",
+        )
+      ) {
+        return;
+      }
+      setReportContent((prev) => `${prev.trim()}\n\n${template}`);
+    } else {
+      setReportContent(template);
+    }
+    setActiveTab("write");
+  };
 
   const handleRefineWithAi = async () => {
     if (!reportContent.trim()) {
@@ -349,7 +394,9 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handleRefineWithAi}
-                    disabled={isRefiningAi || isLoadingContent || !reportContent.trim()}
+                    disabled={
+                      isRefiningAi || isLoadingContent || !reportContent.trim()
+                    }
                     className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     title="대충 작성한 메모를 사람이 읽기 편한 보고서 형식으로 다듬어줍니다"
                   >
@@ -373,27 +420,187 @@ export default function Home() {
                             d="M13 10V3L4 14h7v7l9-11h-7z"
                           />
                         </svg>
-                        <span>AI 보고서 정리</span>
+                        <span>AI 보고 내용 정리</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
-              <textarea
-                id="content"
-                value={reportContent}
-                onChange={(e) => setReportContent(e.target.value)}
-                rows={12}
-                disabled={isLoadingContent}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none text-gray-900 placeholder-gray-400 disabled:bg-gray-50"
-                placeholder={
-                  isLoadingContent
-                    ? "불러오는 중..."
-                    : selectedDate === getTodayKey()
-                      ? "오늘 수행한 업무를 작성해주세요."
-                      : `${formatDateLabel(selectedDate)}에 수행한 업무를 작성해주세요.`
-                }
-              />
+
+              {/* 마크다운 툴바 및 작성/미리보기 탭 */}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                {/* 서식 단축 버튼들 */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("**", "**")}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="굵게 (**텍스트**)"
+                  >
+                    B
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("*", "*")}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-white text-xs italic font-serif text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="기울임 (*텍스트*)"
+                  >
+                    I
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("~~", "~~")}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-white text-xs line-through text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="취소선 (~~텍스트~~)"
+                  >
+                    S
+                  </button>
+                  <span className="mx-0.5 h-4 w-px bg-gray-200" />
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("### ")}
+                    className="inline-flex h-7 px-2 items-center justify-center rounded border border-gray-200 bg-white text-[11px] font-bold text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="소제목 (### 제목)"
+                  >
+                    H3
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("- ")}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="글머리 기호 (- 항목)"
+                  >
+                    •
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("- [ ] ")}
+                    className="inline-flex h-7 px-1.5 items-center justify-center gap-1 rounded border border-gray-200 bg-white text-[11px] text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="체크리스트 할 일 (- [ ] 할일)"
+                  >
+                    <span className="text-gray-400">☐</span> 할일
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("- [x] ")}
+                    className="inline-flex h-7 px-1.5 items-center justify-center gap-1 rounded border border-gray-200 bg-white text-[11px] text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                    title="완료 체크리스트 (- [x] 완료)"
+                  >
+                    <span className="text-emerald-600 font-bold">☑</span> 완료
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("`", "`")}
+                    className="inline-flex h-7 px-1.5 items-center justify-center rounded border border-gray-200 bg-white font-mono text-[11px] text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="코드 (`코드`)"
+                  >
+                    &lt;/&gt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown("> ")}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                    title="인용구 (> 인용)"
+                  >
+                    &gt;
+                  </button>
+                  <span className="mx-0.5 h-4 w-px bg-gray-200" />
+                  <button
+                    type="button"
+                    onClick={insertTemplate}
+                    className="inline-flex h-7 px-2 items-center justify-center gap-1 rounded border border-indigo-200 bg-indigo-50/50 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                    title="기본 일일 보고서 템플릿(진행업무, 이슈, 내일계획) 삽입"
+                  >
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    양식 삽입
+                  </button>
+                </div>
+
+                {/* 편집 / 미리보기 탭 토글 */}
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-100 text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("write")}
+                    className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                      activeTab === "write"
+                        ? "bg-white text-gray-900 shadow-xs font-semibold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    ✏️ 작성
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("preview")}
+                    className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                      activeTab === "preview"
+                        ? "bg-indigo-600 text-white shadow-xs font-semibold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    👁️ 미리보기
+                  </button>
+                </div>
+              </div>
+
+              {activeTab === "write" ? (
+                <textarea
+                  id="content"
+                  ref={contentTextareaRef}
+                  value={reportContent}
+                  onChange={(e) => setReportContent(e.target.value)}
+                  rows={12}
+                  disabled={isLoadingContent}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none text-gray-900 placeholder-gray-400 disabled:bg-gray-50 font-sans"
+                  placeholder={
+                    isLoadingContent
+                      ? "불러오는 중..."
+                      : selectedDate === getTodayKey()
+                        ? "오늘 수행한 업무를 마크다운 서식으로 자유롭게 작성해주세요."
+                        : `${formatDateLabel(selectedDate)}에 수행한 업무를 마크다운 서식으로 작성해주세요.`
+                  }
+                />
+              ) : (
+                <div className="w-full min-h-[300px] max-h-[500px] overflow-y-auto px-5 py-4 border border-indigo-200 rounded-lg bg-slate-50/50 shadow-inner">
+                  <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2 text-xs text-gray-500">
+                    <span className="font-semibold text-indigo-700 flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-indigo-600" />
+                      마크다운 서식 렌더링 미리보기
+                    </span>
+                    <span>팀원 및 팀장님께 표시되는 실제 화면입니다</span>
+                  </div>
+                  {reportContent.trim() ? (
+                    <MarkdownView content={reportContent} />
+                  ) : (
+                    <p className="text-sm text-gray-400 italic py-10 text-center">
+                      작성된 내용이 없습니다. '작성' 탭에서 보고 내용을
+                      입력해보세요.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-indigo-50/30 border border-indigo-100/90 px-3.5 py-2 text-xs text-gray-700 shadow-2xs">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-xs">
+                  💡
+                </span>
+                <span>
+                  <span className="font-semibold text-indigo-700">"양식 삽입"</span> 혹은{" "}
+                  <span className="font-semibold text-purple-700">"AI 보고 내용 정리"</span> 사용을 권장합니다.
+                </span>
+              </div>
 
               {/* 첨부파일 */}
               <div className="mt-4">
