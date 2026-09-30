@@ -10,6 +10,8 @@ import { isLeaveContent, MEMBERS } from "@/app/lib/members";
 import ReportAiChatModal from "@/app/components/ReportAiChatModal";
 import ProjectSummaryModal from "@/app/components/ProjectSummaryModal";
 import MemberSummaryModal from "@/app/components/MemberSummaryModal";
+import ReportRiskRadarModal from "@/app/components/ReportRiskRadarModal";
+import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
 import MarkdownView from "@/app/components/MarkdownView";
 
 function formatDateLabel(dateKey: string): string {
@@ -107,6 +109,8 @@ export default function ReadReportContent({
   const [aiChatModalOpen, setAiChatModalOpen] = useState(false);
   const [projectSummaryModalOpen, setProjectSummaryModalOpen] = useState(false);
   const [memberSummaryModalOpen, setMemberSummaryModalOpen] = useState(false);
+  const [riskRadarModalOpen, setRiskRadarModalOpen] = useState(false);
+  const [workloadModalOpen, setWorkloadModalOpen] = useState(false);
 
   const handleCopyAll = async () => {
     if (submittedReports.length === 0) {
@@ -155,11 +159,37 @@ export default function ReadReportContent({
             날짜를 클릭하면 해당 날짜의 팀원별 보고를 볼 수 있습니다.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setRiskRadarModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-rose-700 hover:via-red-700 hover:to-rose-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+            title="최근 보고서를 분석하여 잠재적 지연/장애 리스크를 조기 감지합니다"
+          >
+            <span className="text-base">🚨</span>
+            <span>AI 리스크 레이더</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+              위험 감지
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWorkloadModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-teal-700 hover:via-emerald-700 hover:to-teal-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+            title="프로젝트별 투입 공수 및 팀원별 업무 비중을 시각화합니다"
+          >
+            <span className="text-base">📊</span>
+            <span>업무 비중 분석</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+              공수 통계
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setMemberSummaryModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
           >
             <svg
               className="w-4 h-4 text-purple-200"
@@ -174,16 +204,16 @@ export default function ReadReportContent({
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <span>최근 팀원 보고 AI 요약</span>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white">
-              5일치 취합
+            <span>최근 보고 요약</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+              5일 취합
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setAiChatModalOpen(true)}
-            className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
           >
             <svg
               className="w-4 h-4 text-amber-300 animate-pulse"
@@ -198,8 +228,8 @@ export default function ReadReportContent({
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <span>AI에게 질문하기</span>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white">
+            <span>AI 질문 비서</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
               사내 LLM
             </span>
           </button>
@@ -520,6 +550,18 @@ export default function ReadReportContent({
           username: r.username,
           content: r.report.content,
         }))}
+      />
+
+      {/* AI 프로젝트 리스크 레이더 모달 */}
+      <ReportRiskRadarModal
+        isOpen={riskRadarModalOpen}
+        onClose={() => setRiskRadarModalOpen(false)}
+      />
+
+      {/* 팀 업무 비중 및 공수 분석 모달 */}
+      <ReportWorkloadModal
+        isOpen={workloadModalOpen}
+        onClose={() => setWorkloadModalOpen(false)}
       />
     </div>
   );

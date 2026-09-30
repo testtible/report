@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import MarkdownView from "@/app/components/MarkdownView";
+import {
+  getDaysAgoKey,
+  getMonthsAgoKey,
+  getTodayKey,
+  validateDateRange,
+} from "@/app/lib/dates";
 
 type Props = {
   isOpen: boolean;
@@ -24,10 +30,50 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
   const [loadingStage, setLoadingStage] = useState<string>("");
   const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
 
+  // 조회 기간 상태 (기본값: 1개월 전 ~ 오늘, 최대 3개월)
+  const [startDate, setStartDate] = useState(() => getMonthsAgoKey(1));
+  const [endDate, setEndDate] = useState(() => getTodayKey());
+  const [preset, setPreset] = useState<"1w" | "1m" | "2m" | "3m" | "custom">(
+    "1m",
+  );
+  const [dateRangeError, setDateRangeError] = useState<string | null>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const answerContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelectPreset = (p: "1w" | "1m" | "2m" | "3m") => {
+    const today = getTodayKey();
+    let start = today;
+    if (p === "1w") start = getDaysAgoKey(7);
+    else if (p === "1m") start = getMonthsAgoKey(1);
+    else if (p === "2m") start = getMonthsAgoKey(2);
+    else if (p === "3m") start = getMonthsAgoKey(3);
+
+    setStartDate(start);
+    setEndDate(today);
+    setPreset(p);
+    setDateRangeError(null);
+  };
+
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart);
+    setPreset("custom");
+    const val = validateDateRange(newStart, endDate, 3);
+    setDateRangeError(
+      val.valid ? null : (val.error ?? "유효하지 않은 기간입니다."),
+    );
+  };
+
+  const handleEndDateChange = (newEnd: string) => {
+    setEndDate(newEnd);
+    setPreset("custom");
+    const val = validateDateRange(startDate, newEnd, 3);
+    setDateRangeError(
+      val.valid ? null : (val.error ?? "유효하지 않은 기간입니다."),
+    );
+  };
 
   // 모달이 열릴 때 input에 포커스
   useEffect(() => {
@@ -48,7 +94,8 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
     if (answerContainerRef.current) {
-      answerContainerRef.current.scrollTop = answerContainerRef.current.scrollHeight;
+      answerContainerRef.current.scrollTop =
+        answerContainerRef.current.scrollHeight;
     }
   }, [answer]);
 
@@ -66,6 +113,12 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
     const q = (promptQuestion ?? question).trim();
     if (!q) return;
 
+    const dateVal = validateDateRange(startDate, endDate, 3);
+    if (!dateVal.valid) {
+      setError(dateVal.error || "기간 설정이 올바르지 않습니다. (최대 3개월)");
+      return;
+    }
+
     if (promptQuestion) {
       setQuestion(promptQuestion);
     }
@@ -81,11 +134,13 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
     setError(null);
     setAnswer("");
     setIsCopied(false);
-    setLoadingStage("1/2단계: 사내 DB 전체에서 관련 보고서를 검색 및 추출하고 있습니다...");
+    setLoadingStage(
+      "1/2단계: DB에서 지정된 기간의 관련 보고서를 검색 및 추출하고 있습니다...",
+    );
 
     const stageTimer = setTimeout(() => {
       setLoadingStage(
-        "2/2단계: 사내 온프레미스 AI(Ollama)가 보고서를 정밀 분석하여 답변을 구성 중입니다 (약 5~15초 소요)..."
+        "2/2단계: 사내 구축된 ON-PREMISE AI가 보고서를 정밀 분석하여 답변을 구성 중입니다. 잠시만 기다려주세요...",
       );
     }, 2000);
 
@@ -93,14 +148,18 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
       const response = await fetch("/api/report/ask-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({
+          question: q,
+          startDate,
+          endDate,
+        }),
         signal: abortController.signal,
       });
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(
-          data?.error || `서버 에러가 발생했습니다. (${response.status})`
+          data?.error || `서버 에러가 발생했습니다. (${response.status})`,
         );
       }
 
@@ -124,7 +183,9 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
         return;
       }
       const message =
-        err instanceof Error ? err.message : "AI 답변 생성 중 오류가 발생했습니다.";
+        err instanceof Error
+          ? err.message
+          : "AI 답변 생성 중 오류가 발생했습니다.";
       setError(message);
     } finally {
       clearTimeout(stageTimer);
@@ -183,7 +244,8 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                기한 제한 없이 전체 팀원 보고서 DB를 기반으로 실시간 답변합니다.
+                조회 기간({startDate} ~ {endDate}) 내의 팀원 보고서 DB를
+                기반으로 실시간 분석·답변합니다.
               </p>
             </div>
           </div>
@@ -211,6 +273,120 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
 
         {/* 모달 본문 */}
         <div className="p-6 overflow-y-auto space-y-4">
+          {/* 조회 기간 설정 카드 */}
+          <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 via-slate-50 to-indigo-50/30 p-3.5 space-y-2.5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-semibold text-gray-800 text-xs">
+                <svg
+                  className="w-4 h-4 text-indigo-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <span>조회 기간 설정</span>
+                <span className="text-[11px] font-normal text-indigo-700 bg-indigo-50 border border-indigo-200/80 rounded-md px-1.5 py-0.5">
+                  기본 1개월 · 최대 3개월
+                </span>
+              </div>
+
+              {/* 기간 프리셋 버튼 그룹 */}
+              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleSelectPreset("1w")}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                    preset === "1w"
+                      ? "bg-indigo-600 text-white shadow-2xs font-semibold"
+                      : "text-gray-600 hover:text-indigo-600"
+                  }`}
+                >
+                  1주일
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleSelectPreset("1m")}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                    preset === "1m"
+                      ? "bg-indigo-600 text-white shadow-2xs font-semibold"
+                      : "text-gray-600 hover:text-indigo-600"
+                  }`}
+                >
+                  1개월 (기본)
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleSelectPreset("2m")}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                    preset === "2m"
+                      ? "bg-indigo-600 text-white shadow-2xs font-semibold"
+                      : "text-gray-600 hover:text-indigo-600"
+                  }`}
+                >
+                  2개월
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleSelectPreset("3m")}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                    preset === "3m"
+                      ? "bg-indigo-600 text-white shadow-2xs font-semibold"
+                      : "text-gray-600 hover:text-indigo-600"
+                  }`}
+                >
+                  3개월 (최대)
+                </button>
+              </div>
+            </div>
+
+            {/* 직접 날짜 선택 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs text-gray-700 shadow-2xs focus-within:ring-2 focus-within:ring-indigo-200 focus-within:border-indigo-400">
+                <span className="text-gray-500 font-medium">시작일</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  max={endDate}
+                  disabled={isLoading}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="outline-none bg-transparent text-gray-800 cursor-pointer disabled:cursor-not-allowed text-xs"
+                />
+              </div>
+              <span className="text-gray-400 font-bold text-xs">~</span>
+              <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs text-gray-700 shadow-2xs focus-within:ring-2 focus-within:ring-indigo-200 focus-within:border-indigo-400">
+                <span className="text-gray-500 font-medium">종료일</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  disabled={isLoading}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  className="outline-none bg-transparent text-gray-800 cursor-pointer disabled:cursor-not-allowed text-xs"
+                />
+              </div>
+
+              {dateRangeError ? (
+                <span className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>{dateRangeError}</span>
+                </span>
+              ) : (
+                <span className="text-[11px] text-gray-500">
+                  해당 기간 내의 보고서만 AI가 분석합니다.
+                </span>
+              )}
+            </div>
+          </div>
           {/* 추천 질문 칩 */}
           <div>
             <p className="text-xs font-medium text-gray-500 mb-2">
@@ -405,8 +581,8 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
                   answer
                     ? answer
                     : isLoading
-                    ? loadingStage || "보고서 데이터를 분석하고 있습니다..."
-                    : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
+                      ? loadingStage || "보고서 데이터를 분석하고 있습니다..."
+                      : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
                 }
                 className={`w-full rounded-xl border p-4 text-sm font-mono leading-relaxed outline-none transition-all resize-none ${
                   answer
@@ -420,7 +596,10 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
 
         {/* 모달 푸터 */}
         <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-          <span>* 사내 폐쇄망 온프레미스 LLM을 활용하여 외부로 데이터가 유출되지 않습니다.</span>
+          <span>
+            * 사내 폐쇄망 온프레미스 LLM을 활용하여 외부로 데이터가 유출되지
+            않습니다.
+          </span>
           <button
             type="button"
             onClick={onClose}

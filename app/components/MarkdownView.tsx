@@ -420,22 +420,26 @@ export default function MarkdownView({ content, className = "" }: MarkdownViewPr
             return (
               <div
                 key={idx}
-                className={`flex items-start gap-2 text-xs sm:text-sm py-0.5 ${
-                  block.checked ? "text-gray-500" : "text-gray-800"
-                }`}
+                className="flex items-start gap-2 text-xs sm:text-sm py-0.5"
               >
-                <span className="mt-0.5 shrink-0 inline-flex items-center justify-center">
+                <span className="mt-0.5 shrink-0 inline-flex items-center">
                   {block.checked ? (
-                    <span className="h-4 w-4 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-300 text-[11px] font-bold">
-                      ✓
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                      완료
                     </span>
                   ) : (
-                    <span className="h-4 w-4 rounded bg-white text-transparent flex items-center justify-center border border-gray-300 text-[11px]">
-                      ·
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/80">
+                      진행중
                     </span>
                   )}
                 </span>
-                <span className={block.checked ? "line-through text-gray-400" : "font-normal"}>
+                <span
+                  className={`leading-relaxed ${
+                    block.checked
+                      ? "text-gray-900 font-medium"
+                      : "text-gray-700 font-normal"
+                  }`}
+                >
                   {renderInline(block.text)}
                 </span>
               </div>

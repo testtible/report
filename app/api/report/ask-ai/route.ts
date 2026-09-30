@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { MEMBERS } from "@/app/lib/members";
 import { getAiApiUrl, getAiModel } from "@/app/lib/ai";
+import {
+  getMonthsAgoKey,
+  getTodayKey,
+  validateDateRange,
+} from "@/app/lib/dates";
 
 export const maxDuration = 60;
 
@@ -42,6 +47,31 @@ export async function POST(request: NextRequest) {
 
     const trimmedQuestion = question.trim();
 
+    // 기간 설정: 기본값 1개월 전 ~ 오늘, 최대 3개월
+    const today = getTodayKey();
+    const defaultStart = getMonthsAgoKey(1);
+    const startDate =
+      body?.startDate && typeof body.startDate === "string"
+        ? body.startDate
+        : defaultStart;
+    const endDate =
+      body?.endDate && typeof body.endDate === "string"
+        ? body.endDate
+        : today;
+
+    const validation = validateDateRange(startDate, endDate, 3);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: validation.error || "기간 설정이 올바르지 않습니다." },
+        { status: 400 }
+      );
+    }
+
+    const [sy, sm, sd] = startDate.split("-").map(Number);
+    const [ey, em, ed] = endDate.split("-").map(Number);
+    const startDateTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+    const endDateTime = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+
     // 1. 질문에서 팀원 이름 탐색
     const matchedMember = MEMBERS.find((m) => trimmedQuestion.includes(m));
 
@@ -57,34 +87,48 @@ export async function POST(request: NextRequest) {
     let matchedReports: ReportItem[] = [];
 
     if (matchedMember) {
-      // 1순위: 특정 팀원 언급 시 전체 기간에서 해당 팀원의 보고서 최신순 조회
+      // 1순위: 특정 팀원 언급 시 지정된 기간 내에서 해당 팀원의 보고서 최신순 조회
       matchedReports = await prisma.content.findMany({
         where: {
           username: matchedMember,
           content: { not: null },
+          created_at: {
+            gte: startDateTime,
+            lte: endDateTime,
+          },
         },
         orderBy: { created_at: "desc" },
-        take: 12,
+        take: 15,
         select: { username: true, content: true, created_at: true },
       });
     } else if (keywords.length > 0) {
-      // 2순위: 키워드가 있으면 전체 기간에서 해당 키워드를 포함하는 보고서 검색 (기한 제한 없음)
+      // 2순위: 키워드가 있으면 지정된 기간 내에서 해당 키워드를 포함하는 보고서 검색
       matchedReports = await prisma.content.findMany({
         where: {
+          created_at: {
+            gte: startDateTime,
+            lte: endDateTime,
+          },
           OR: keywords.map((kw) => ({
             content: { contains: kw, mode: "insensitive" },
           })),
         },
         orderBy: { created_at: "desc" },
-        take: 12,
+        take: 15,
         select: { username: true, content: true, created_at: true },
       });
     }
 
-    // 3. 만약 검색 결과가 4개 미만이면, 최신 보고서로 보충 (팀 전체 현황 파악 목적)
+    // 3. 만약 검색 결과가 4개 미만이면, 지정 기간 내 최신 보고서로 보충 (팀 전체 현황 파악 목적)
     if (matchedReports.length < 4) {
       const recentReports = await prisma.content.findMany({
-        where: { content: { not: null } },
+        where: {
+          content: { not: null },
+          created_at: {
+            gte: startDateTime,
+            lte: endDateTime,
+          },
+        },
         orderBy: { created_at: "desc" },
         take: 10,
         select: { username: true, content: true, created_at: true },
@@ -111,7 +155,9 @@ export async function POST(request: NextRequest) {
 
     if (validReports.length === 0) {
       return NextResponse.json(
-        { error: "조회 가능한 보고서 데이터가 없습니다." },
+        {
+          error: `설정하신 기간(${startDate} ~ ${endDate}) 내에 조회 가능한 보고서 데이터가 없습니다.`,
+        },
         { status: 404 }
       );
     }
@@ -144,12 +190,12 @@ export async function POST(request: NextRequest) {
 반드시 한국어로 친절하고 명확하게 비즈니스 톤으로 답변해라.
 
 ### Guidelines
-1. 반드시 아래 [사내 보고서 데이터]에 기록된 실제 내용에만 기반해서 답변해라.
-2. [사내 보고서 데이터]에 없는 내용은 절대 거짓으로 지어내지 마라. 내용이 없다면 "제공된 보고서 기록에서는 해당 내용을 찾을 수 없습니다."라고 분명하게 밝혀라.
+1. 반드시 아래 [사내 보고서 데이터 (조회 기간: ${startDate} ~ ${endDate})]에 기록된 실제 내용에만 기반해서 답변해라.
+2. 설정된 기간(${startDate} ~ ${endDate}) 내 데이터에 없는 내용은 절대 거짓으로 지어내지 마라. 내용이 없다면 "설정된 기간(${startDate} ~ ${endDate}) 내의 보고서 기록에서는 해당 내용을 찾을 수 없습니다."라고 분명하게 밝혀라.
 3. 답변할 때는 관련 팀원의 이름과 보고 날짜(예: 9월 12일)를 함께 언급하여 근거를 명확히 제시해라.
 4. 한눈에 읽기 편하도록 간결하고 가독성 좋은 개조식(글머리 기호) 또는 단락으로 정리해라.
 
-### 사내 보고서 데이터
+### 사내 보고서 데이터 (조회 기간: ${startDate} ~ ${endDate})
 ${contextData}
 
 ### 팀장님 질문
@@ -233,7 +279,11 @@ ${trimmedQuestion}
   } catch (error) {
     console.error("AI 질의 처리 오류:", error);
     return NextResponse.json(
-      { error: "서버 내부 오류가 발생했습니다." },
+      {
+        error: `서버 내부 오류가 발생했습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
       { status: 500 }
     );
   }

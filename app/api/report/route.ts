@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
 import { parseAttachmentFromFormData } from "@/app/lib/attachments";
 import {
   dateKeyToCreatedAt,
@@ -35,12 +36,32 @@ export async function GET(request: NextRequest) {
   const { start, end } = getDateRange(dateKey);
   const report = await findReportByDate(username.trim(), start, end);
 
+  let previousReport: { content: string; date: string } | null = null;
+  if (!report) {
+    const prev = await prisma.content.findFirst({
+      where: {
+        username: username.trim(),
+        created_at: { lt: start },
+        content: { not: null },
+      },
+      orderBy: { created_at: "desc" },
+      select: { content: true, created_at: true },
+    });
+    if (prev && prev.content && prev.content.trim()) {
+      previousReport = {
+        content: prev.content.trim(),
+        date: prev.created_at.toISOString().slice(0, 10),
+      };
+    }
+  }
+
   return NextResponse.json({
     content: report?.content ?? "",
     exists: !!report,
     attachmentName: report?.attachment_name ?? null,
     attachmentSize: report?.attachment_size ?? null,
     hasAttachment: !!report?.attachment_name,
+    previousReport,
   });
 }
 

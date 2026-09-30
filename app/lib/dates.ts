@@ -89,3 +89,56 @@ export function formatDateWithWeekday(dateKey: string): string {
   const week = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")} (${week})`;
 }
+
+/** N일 전 날짜를 YYYY-MM-DD 로 반환 */
+export function getDaysAgoKey(days: number, fromDate = new Date()): string {
+  const d = new Date(fromDate);
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** N개월 전 날짜를 YYYY-MM-DD 로 반환 (월말 날짜 오버플로우 방지) */
+export function getMonthsAgoKey(months: number, fromDate = new Date()): string {
+  const d = new Date(fromDate);
+  const originalDate = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - months);
+  const lastDayOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(originalDate, lastDayOfMonth));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** 조회 기간 유효성 검사 (시작일 <= 종료일, 최대 maxMonths개월 이내) */
+export function validateDateRange(
+  startKey: string,
+  endKey: string,
+  maxMonths = 3,
+): { valid: boolean; error?: string } {
+  if (!isValidDateKey(startKey) || !isValidDateKey(endKey)) {
+    return { valid: false, error: "올바른 날짜 형식이 아닙니다 (YYYY-MM-DD)." };
+  }
+  if (startKey > endKey) {
+    return { valid: false, error: "시작일은 종료일보다 이전이어야 합니다." };
+  }
+
+  const [sy, sm, sd] = startKey.split("-").map(Number);
+  const [ey, em, ed] = endKey.split("-").map(Number);
+  // 시작일로부터 maxMonths개월 후 날짜
+  const limitDate = new Date(sy, sm - 1 + maxMonths, sd, 23, 59, 59, 999);
+  const endDate = new Date(ey, em - 1, ed, 0, 0, 0, 0);
+
+  if (endDate > limitDate) {
+    return {
+      valid: false,
+      error: `조회 기간은 최대 ${maxMonths}개월까지만 설정 가능합니다.`,
+    };
+  }
+
+  return { valid: true };
+}

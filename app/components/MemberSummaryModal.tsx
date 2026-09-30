@@ -69,10 +69,14 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
     setIsLoading(true);
     setError(null);
     setSummary("");
-    setLoadingStage(`${username} 팀원의 최근 5일치 보고서를 조회하고 있습니다...`);
+    setLoadingStage(
+      `${username} 팀원의 최근 5일치 보고서를 조회하고 있습니다...`,
+    );
 
     const stageTimer = setTimeout(() => {
-      setLoadingStage("사내 AI 모델이 5일치 보고서 내용을 분석 및 요약 중입니다...");
+      setLoadingStage(
+        "사내 AI 모델이 5일치 보고서 내용을 분석 및 요약 중입니다...",
+      );
     }, 2000);
 
     try {
@@ -86,7 +90,7 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(
-          data?.error || `서버 에러가 발생했습니다. (${response.status})`
+          data?.error || `서버 에러가 발생했습니다. (${response.status})`,
         );
       }
 
@@ -110,7 +114,9 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
         return;
       }
       const message =
-        err instanceof Error ? err.message : "요약 생성 중 오류가 발생했습니다.";
+        err instanceof Error
+          ? err.message
+          : "요약 생성 중 오류가 발생했습니다.";
       setError(message);
     } finally {
       clearTimeout(stageTimer);
@@ -146,7 +152,12 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-slate-50 via-purple-50/50 to-white">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white shadow-sm shadow-purple-200">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -165,7 +176,8 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                팀원을 선택하면 최근 5일치 일일 보고서를 취합하여 실시간으로 요약합니다.
+                팀원을 선택하면 최근 5일치 일일 보고서를 취합하여 실시간으로
+                요약합니다.
               </p>
             </div>
           </div>
@@ -175,8 +187,18 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
             aria-label="닫기"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -186,30 +208,15 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
           {/* 팀원 선택 섹션 */}
           <div className="rounded-xl bg-slate-50 border border-gray-200 p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <label htmlFor="member-select" className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+              <label
+                htmlFor="member-select"
+                className="text-xs font-semibold text-gray-700 flex items-center gap-1.5"
+              >
                 <span>요약할 팀원 선택</span>
                 <span className="font-normal text-gray-400">· 6명</span>
               </label>
 
               <div className="flex items-center gap-2">
-                {/* 팀원 드롭다운 select */}
-                <select
-                  id="member-select"
-                  value={selectedMember}
-                  onChange={(e) => handleSelectMember(e.target.value)}
-                  disabled={isLoading}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none cursor-pointer disabled:bg-gray-100"
-                >
-                  <option value="" disabled>
-                    팀원을 선택해주세요
-                  </option>
-                  {MEMBERS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-
                 {/* 중단 / 다시 요약 버튼 */}
                 {isLoading ? (
                   <button
@@ -217,8 +224,18 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
                     onClick={handleStop}
                     className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition-colors cursor-pointer shrink-0"
                   >
-                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-3.5 h-3.5 animate-spin"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                     <span>생성 중단</span>
                   </button>
@@ -229,8 +246,18 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
                       onClick={() => fetchSummary(selectedMember)}
                       className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer shrink-0"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
                       </svg>
                       <span>다시 요약</span>
                     </button>
@@ -265,8 +292,18 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
           {/* 에러 알림 */}
           {error && (
             <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
-              <svg className="h-4 w-4 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-4 w-4 shrink-0 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <span className="flex-1">{error}</span>
             </div>
@@ -322,15 +359,37 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
                 >
                   {isCopied ? (
                     <>
-                      <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-3.5 h-3.5 text-emerald-600"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
-                      <span className="text-emerald-600 font-semibold">복사됨!</span>
+                      <span className="text-emerald-600 font-semibold">
+                        복사됨!
+                      </span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 3h6" />
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 3h6"
+                        />
                       </svg>
                       <span>요약 복사</span>
                     </>
@@ -363,19 +422,34 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
                 {isLoading ? (
                   <div className="space-y-3">
                     <div className="h-8 w-8 mx-auto rounded-full border-3 border-purple-200 border-t-purple-600 animate-spin" />
-                    <p className="text-xs font-medium text-gray-600">{loadingStage}</p>
-                    <p className="text-[11px] text-gray-400">잠시만 기다려주세요...</p>
+                    <p className="text-xs font-medium text-gray-600">
+                      {loadingStage}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      잠시만 기다려주세요...
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2 text-gray-400">
-                    <svg className="w-10 h-10 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <svg
+                      className="w-10 h-10 mx-auto text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
                     </svg>
                     <p className="text-sm font-medium text-gray-600">
                       요약할 팀원을 상단에서 선택해주세요.
                     </p>
                     <p className="text-xs text-gray-400">
-                      최근 5일간 작성된 보고서 내용을 취합하여 마크다운 서식으로 실시간 스트리밍 요약합니다.
+                      최근 5일간 작성된 보고서 내용을 취합하여 마크다운 서식으로
+                      실시간 스트리밍 요약합니다.
                     </p>
                   </div>
                 )}
@@ -386,7 +460,10 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
 
         {/* 모달 푸터 */}
         <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-          <span>* 사내 폐쇄망 온프레미스 LLM을 활용하여 외부로 데이터가 유출되지 않습니다.</span>
+          <span>
+            * 사내 폐쇄망 온프레미스 LLM을 활용하여 외부로 데이터가 유출되지
+            않습니다.
+          </span>
           <button
             type="button"
             onClick={onClose}
