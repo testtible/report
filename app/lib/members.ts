@@ -5,6 +5,7 @@ export const MEMBERS = [
   "강민석",
   "권혁재",
   "전승기",
+  "테스터",
 ] as const;
 
 export type MemberName = (typeof MEMBERS)[number];
