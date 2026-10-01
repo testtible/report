@@ -8,6 +8,11 @@ type Props = {
   onClose: () => void;
   selectedDate: string;
   reports: Array<{ username: string; content: string }>;
+  data?: string | null;
+  isLoading?: boolean;
+  error?: string | null;
+  updatedAt?: number | null;
+  onRefresh?: () => void;
 };
 
 export default function ProjectSummaryModal({
@@ -15,21 +20,36 @@ export default function ProjectSummaryModal({
   onClose,
   selectedDate,
   reports,
+  data: propData,
+  isLoading: propIsLoading,
+  error: propError,
+  updatedAt,
+  onRefresh,
 }: Props) {
-  const [summary, setSummary] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [internalSummary, setInternalSummary] = useState<string | null>(null);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
 
+  const isControlled = propData !== undefined || propIsLoading !== undefined;
+  const summary = isControlled ? propData ?? null : internalSummary;
+  const loading = isControlled ? Boolean(propIsLoading) : internalLoading;
+  const error = isControlled ? propError ?? null : internalError;
+
   const fetchProjectSummary = useCallback(async () => {
-    if (reports.length === 0) {
-      setError("취합할 제출 보고서가 없습니다.");
+    if (onRefresh) {
+      onRefresh();
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    if (reports.length === 0) {
+      setInternalError("취합할 제출 보고서가 없습니다.");
+      return;
+    }
+
+    setInternalLoading(true);
+    setInternalError(null);
     setIsCopied(false);
 
     try {
@@ -44,24 +64,23 @@ export default function ProjectSummaryModal({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "프로젝트 취합 생성에 실패했습니다.");
+        setInternalError(data.error || "프로젝트 취합 생성에 실패했습니다.");
         return;
       }
 
-      setSummary(data.summary || "정리된 내용이 없습니다.");
+      setInternalSummary(data.summary || "정리된 내용이 없습니다.");
     } catch {
-      setError("네트워크 오류가 발생했습니다.");
+      setInternalError("네트워크 오류가 발생했습니다.");
     } finally {
-      setLoading(false);
+      setInternalLoading(false);
     }
-  }, [reports, selectedDate]);
+  }, [reports, selectedDate, onRefresh]);
 
   useEffect(() => {
-    if (isOpen) {
-      setSummary(null);
+    if (isOpen && !isControlled) {
       fetchProjectSummary();
     }
-  }, [isOpen, fetchProjectSummary]);
+  }, [isOpen, isControlled, fetchProjectSummary]);
 
   if (!isOpen) return null;
 
@@ -113,32 +132,69 @@ export default function ProjectSummaryModal({
                 <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">
                   AI 자동 분류
                 </span>
+                {updatedAt && (
+                  <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    {new Date(updatedAt).toLocaleTimeString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    갱신
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 {selectedDate} · 팀원 {reports.length}명의 보고서를 프로젝트 단위로 그룹화했습니다.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
-            aria-label="닫기"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={fetchProjectSummary}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/80 px-2.5 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-all hover:shadow-xs disabled:opacity-50 cursor-pointer"
+              title="새로 등록된 보고서를 반영하여 즉시 최신 데이터로 다시 취합합니다"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className={`w-3.5 h-3.5 ${
+                  loading ? "animate-spin text-purple-600" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>{loading ? "취합 중..." : "수동 갱신"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
+              aria-label="닫기"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* 본문 영역 */}

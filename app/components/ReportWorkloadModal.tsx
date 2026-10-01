@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MarkdownView from "@/app/components/MarkdownView";
 
 type ProjectItem = {
@@ -31,6 +31,11 @@ type WorkloadData = {
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  data?: WorkloadData | null;
+  isLoading?: boolean;
+  error?: string | null;
+  updatedAt?: number | null;
+  onRefresh?: () => void;
 };
 
 type ColorTheme = {
@@ -148,15 +153,32 @@ function getProjectColor(idx: number): ColorTheme {
   return COLOR_MAP[key] || COLOR_MAP.blue;
 }
 
-export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
-  const [data, setData] = useState<WorkloadData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function ReportWorkloadModal({
+  isOpen,
+  onClose,
+  data: propData,
+  isLoading: propIsLoading,
+  error: propError,
+  updatedAt,
+  onRefresh,
+}: Props) {
+  const [internalData, setInternalData] = useState<WorkloadData | null>(null);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"projects" | "members">("projects");
 
-  const loadWorkload = async () => {
-    setIsLoading(true);
-    setError(null);
+  const isControlled = propData !== undefined || propIsLoading !== undefined;
+  const data = isControlled ? propData ?? null : internalData;
+  const isLoading = isControlled ? Boolean(propIsLoading) : internalLoading;
+  const error = isControlled ? propError ?? null : internalError;
+
+  const loadWorkload = useCallback(async () => {
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    setInternalLoading(true);
+    setInternalError(null);
     try {
       const res = await fetch("/api/report/workload-analysis", {
         method: "POST",
@@ -165,21 +187,21 @@ export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
       if (!res.ok) {
         throw new Error(json.error || "업무 비중 분석 요청에 실패했습니다.");
       }
-      setData(json.data);
+      setInternalData(json.data);
     } catch (err) {
-      setError(
+      setInternalError(
         err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.",
       );
     } finally {
-      setIsLoading(false);
+      setInternalLoading(false);
     }
-  };
+  }, [onRefresh]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isControlled) {
       loadWorkload();
     }
-  }, [isOpen]);
+  }, [isOpen, isControlled, loadWorkload]);
 
   if (!isOpen) return null;
 
@@ -208,6 +230,16 @@ export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
                 <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[11px] font-semibold text-teal-800">
                   프로젝트 리소스 분석
                 </span>
+                {updatedAt && (
+                  <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    {new Date(updatedAt).toLocaleTimeString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    갱신 (30분 주기)
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 최근 2주간 보고서를 기반으로 프로젝트별 투입 공수(%)와 팀원별
@@ -215,26 +247,53 @@ export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
-            aria-label="닫기"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={loadWorkload}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition-all hover:shadow-xs disabled:opacity-50 cursor-pointer"
+              title="새로 등록된 보고서를 반영하여 즉시 최신 데이터로 다시 분석합니다"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className={`w-3.5 h-3.5 ${
+                  isLoading ? "animate-spin text-teal-600" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>{isLoading ? "분석 중..." : "수동 갱신"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
+              aria-label="닫기"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* 본문 */}
@@ -393,11 +452,15 @@ export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
 
                 <button
                   type="button"
+                  disabled={isLoading}
                   onClick={loadWorkload}
-                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs text-teal-800 hover:text-teal-950 font-semibold transition-colors cursor-pointer bg-teal-50 border border-teal-200/80 rounded-lg px-2.5 py-1 disabled:opacity-50"
+                  title="새로 등록된 보고서를 반영하여 즉시 다시 분석합니다"
                 >
                   <svg
-                    className="w-3.5 h-3.5"
+                    className={`w-3.5 h-3.5 ${
+                      isLoading ? "animate-spin text-teal-600" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -409,7 +472,7 @@ export default function ReportWorkloadModal({ isOpen, onClose }: Props) {
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
-                  다시 분석
+                  <span>{isLoading ? "분석 중..." : "최신 데이터로 재분석"}</span>
                 </button>
               </div>
 

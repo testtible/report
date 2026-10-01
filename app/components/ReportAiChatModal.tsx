@@ -12,16 +12,31 @@ import {
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  targetMember?: string | null;
 };
 
-const SUGGESTED_QUESTIONS = [
+const GENERAL_SUGGESTED_QUESTIONS = [
   "최근 팀원들이 보고한 이슈나 장애 사항 요약해줘",
   "각 팀원별 주요 진행 업무와 성과를 정리해줘",
   "일정 지연이나 추가 지원이 필요한 업무가 있어?",
   "외부 미팅이나 출장 관련 보고 내역 알려줘",
 ];
 
-export default function ReportAiChatModal({ isOpen, onClose }: Props) {
+const getMemberSuggestedQuestions = (member: string) => [
+  `최근 ${member} 님이 진행한 주요 업무와 성과를 요약해줘`,
+  `최근 보고서에 작성한 이슈나 기술적 애로사항이 있어?`,
+  `현재 진행 중이거나 예정된 다음 업무 계획 알려줘`,
+  `최근 외부 미팅이나 출장, 휴가 관련 보고 내역 알려줘`,
+];
+
+export default function ReportAiChatModal({
+  isOpen,
+  onClose,
+  targetMember,
+}: Props) {
+  const suggestedQuestions = targetMember
+    ? getMemberSuggestedQuestions(targetMember)
+    : GENERAL_SUGGESTED_QUESTIONS;
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -99,6 +114,13 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
     }
   }, [answer]);
 
+  // 대상 팀원이 변경되면 기존 입력 및 답변 초기화
+  useEffect(() => {
+    setQuestion("");
+    setAnswer("");
+    setError(null);
+  }, [targetMember]);
+
   if (!isOpen) return null;
 
   const handleStop = () => {
@@ -152,6 +174,7 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
           question: q,
           startDate,
           endDate,
+          member: targetMember || undefined,
         }),
         signal: abortController.signal,
       });
@@ -237,15 +260,18 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-gray-900 text-base">
-                  보고서 AI 질의응답 비서
+                  {targetMember
+                    ? `${targetMember} 님 AI 질의응답`
+                    : "보고서 AI 질의응답 비서"}
                 </h3>
                 <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                  사내 로컬 LLM
+                  {targetMember ? `${targetMember} 전용` : "사내 로컬 LLM"}
                 </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                조회 기간({startDate} ~ {endDate}) 내의 팀원 보고서 DB를
-                기반으로 실시간 분석·답변합니다.
+                {targetMember
+                  ? `조회 기간(${startDate} ~ ${endDate}) 내의 ${targetMember} 님 보고서 DB를 기반으로 실시간 분석·답변합니다.`
+                  : `조회 기간(${startDate} ~ ${endDate}) 내의 팀원 보고서 DB를 기반으로 실시간 분석·답변합니다.`}
               </p>
             </div>
           </div>
@@ -393,7 +419,7 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
               💡 추천 질문 클릭
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {SUGGESTED_QUESTIONS.map((item, idx) => (
+              {suggestedQuestions.map((item, idx) => (
                 <button
                   key={idx}
                   type="button"
@@ -421,7 +447,11 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               disabled={isLoading}
-              placeholder="궁금한 내용을 질문해 보세요 (예: OOO 님의 최근 업무 내용 요약)"
+              placeholder={
+                targetMember
+                  ? `${targetMember} 님의 업무에 대해 질문해 보세요 (예: 최근 진행한 주요 업무 요약)`
+                  : "궁금한 내용을 질문해 보세요 (예: OOO 님의 최근 업무 내용 요약)"
+              }
               className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all disabled:bg-gray-50"
             />
             {isLoading ? (
@@ -582,7 +612,9 @@ export default function ReportAiChatModal({ isOpen, onClose }: Props) {
                     ? answer
                     : isLoading
                       ? loadingStage || "보고서 데이터를 분석하고 있습니다..."
-                      : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
+                      : targetMember
+                        ? `질문을 입력하시면 ${targetMember} 님의 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다.`
+                        : "질문을 입력하시면 전체 팀원 보고서 DB를 분석하여 실시간으로 답변이 작성됩니다."
                 }
                 className={`w-full rounded-xl border p-4 text-sm font-mono leading-relaxed outline-none transition-all resize-none ${
                   answer

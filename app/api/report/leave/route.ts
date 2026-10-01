@@ -53,12 +53,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { username, type, startDate, endDate } = body as {
-      username: string;
-      type: LeaveType;
-      startDate: string;
-      endDate: string;
-    };
+    const { username, type, startDate, endDate, dates, excludeWeekends } =
+      body as {
+        username: string;
+        type: LeaveType;
+        startDate?: string;
+        endDate?: string;
+        dates?: string[];
+        excludeWeekends?: boolean;
+      };
 
     if (!username?.trim()) {
       return NextResponse.json(
@@ -74,22 +77,33 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      !startDate ||
-      !endDate ||
-      !isValidDateKey(startDate) ||
-      !isValidDateKey(endDate)
+    let dateKeys: string[] = [];
+    if (Array.isArray(dates) && dates.length > 0) {
+      dateKeys = dates.filter(isValidDateKey);
+    } else if (
+      startDate &&
+      endDate &&
+      isValidDateKey(startDate) &&
+      isValidDateKey(endDate)
     ) {
+      const allDates = expandDateRange(startDate, endDate);
+      dateKeys = excludeWeekends
+        ? allDates.filter((d) => {
+            const [y, m, day] = d.split("-").map(Number);
+            const dow = new Date(y, m - 1, day).getDay();
+            return dow !== 0 && dow !== 6;
+          })
+        : allDates;
+    } else {
       return NextResponse.json(
         { error: "유효한 기간을 선택해주세요." },
         { status: 400 },
       );
     }
 
-    const dateKeys = expandDateRange(startDate, endDate);
     if (dateKeys.length === 0) {
       return NextResponse.json(
-        { error: "유효한 기간을 선택해주세요." },
+        { error: "지정할 수 있는 유효한 날짜가 없습니다 (주말 제외 등)." },
         { status: 400 },
       );
     }
@@ -156,10 +170,11 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json();
-    const { username, startDate, endDate } = body as {
+    const { username, startDate, endDate, dates } = body as {
       username: string;
-      startDate: string;
-      endDate: string;
+      startDate?: string;
+      endDate?: string;
+      dates?: string[];
     };
 
     if (!username?.trim()) {
@@ -169,19 +184,23 @@ export async function DELETE(request: Request) {
       );
     }
 
-    if (
-      !startDate ||
-      !endDate ||
-      !isValidDateKey(startDate) ||
-      !isValidDateKey(endDate)
+    let dateKeys: string[] = [];
+    if (Array.isArray(dates) && dates.length > 0) {
+      dateKeys = dates.filter(isValidDateKey);
+    } else if (
+      startDate &&
+      endDate &&
+      isValidDateKey(startDate) &&
+      isValidDateKey(endDate)
     ) {
+      dateKeys = expandDateRange(startDate, endDate);
+    } else {
       return NextResponse.json(
-        { error: "유효한 기간을 선택해주세요." },
+        { error: "유효한 기간 또는 날짜를 선택해주세요." },
         { status: 400 },
       );
     }
 
-    const dateKeys = expandDateRange(startDate, endDate);
     if (dateKeys.length === 0) {
       return NextResponse.json(
         { error: "유효한 기간을 선택해주세요." },

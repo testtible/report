@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import LeaveScheduleModal from "@/app/components/LeaveScheduleModal";
 import ReportHistoryModal from "@/app/components/ReportHistoryModal";
+import ReportAiChatModal from "@/app/components/ReportAiChatModal";
 import MarkdownView from "@/app/components/MarkdownView";
 import {
   formatFileSize,
@@ -27,6 +28,7 @@ export default function Home() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [aiChatModalOpen, setAiChatModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingAttachmentName, setExistingAttachmentName] = useState<
     string | null
@@ -327,56 +329,91 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        {/* 헤더 */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            일일 보고서{" "}
-            <span className="text-2xl font-normal text-gray-600">
-              {formatDateWithWeekday(selectedDate)}
-            </span>
-          </h1>
-          <p className="text-gray-600">팀장님께 보고할 내용을 작성해주세요</p>
-        </div>
-
         {/* 폼 카드 */}
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 날짜 선택 + 출장·휴가 지정 */}
             <div>
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <label className="block text-sm font-semibold text-gray-700">
-                  보고 날짜
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedMember) {
-                      alert(
-                        "출장 및 휴가를 지정하려면 먼저 팀원을 선택해주세요.",
-                      );
-                      return;
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">
+                  일일 보고서{" "}
+                  <span className="text-base sm:text-lg font-semibold text-gray-600">
+                    {formatDateWithWeekday(selectedDate)}
+                  </span>
+                </h1>
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedMember) {
+                        alert("AI에게 질문하려면 먼저 팀원을 선택해주세요.");
+                        return;
+                      }
+                      setAiChatModalOpen(true);
+                    }}
+                    disabled={!selectedMember}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                      selectedMember
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm hover:from-indigo-700 hover:to-purple-700 hover:shadow-md cursor-pointer"
+                        : "border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                    }`}
+                    title={
+                      selectedMember
+                        ? `${selectedMember} 님의 과거 보고서를 기반으로 AI에게 질문합니다`
+                        : "팀원을 먼저 선택하면 AI 질문 기능이 활성화됩니다"
                     }
-                    setLeaveModalOpen(true);
-                  }}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
-                >
-                  <svg
-                    className="w-4 h-4 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  출장 및 휴가 지정
-                </button>
+                    <svg
+                      className={`w-4 h-4 ${
+                        selectedMember
+                          ? "text-amber-300 animate-pulse"
+                          : "text-gray-400"
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                    <span>AI에게 질문하기</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedMember) {
+                        alert(
+                          "출장 및 휴가를 지정하려면 먼저 팀원을 선택해주세요.",
+                        );
+                        return;
+                      }
+                      setLeaveModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-4 h-4 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    출장 및 휴가 지정
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-gray-500 mb-3">
                 주말을 제외한 최근 평일 5일 중 날짜를 선택해 작성하거나 수정할
@@ -966,6 +1003,12 @@ export default function Home() {
         username={selectedMember}
         isOpen={leaveModalOpen}
         onClose={() => setLeaveModalOpen(false)}
+      />
+
+      <ReportAiChatModal
+        isOpen={aiChatModalOpen}
+        onClose={() => setAiChatModalOpen(false)}
+        targetMember={selectedMember}
       />
     </div>
   );

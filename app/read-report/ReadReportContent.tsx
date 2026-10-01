@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import ReportAttachmentLink from "@/app/components/ReportAttachmentLink";
 import type { MemberReport } from "@/app/lib/attachments";
 import { getLeaveTypeColor } from "@/app/lib/leave";
-import { formatModifiedReportDate, type ModifiedReportItem } from "@/app/lib/modifiedReports";
+import {
+  formatModifiedReportDate,
+  type ModifiedReportItem,
+} from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
 import ReportAiChatModal from "@/app/components/ReportAiChatModal";
 import ProjectSummaryModal from "@/app/components/ProjectSummaryModal";
@@ -13,6 +16,7 @@ import MemberSummaryModal from "@/app/components/MemberSummaryModal";
 import ReportRiskRadarModal from "@/app/components/ReportRiskRadarModal";
 import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
 import MarkdownView from "@/app/components/MarkdownView";
+import { useAiReportPrefetch } from "@/app/read-report/useAiReportPrefetch";
 
 function formatDateLabel(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -88,20 +92,41 @@ export default function ReadReportContent({
   modifiedReports,
 }: Props) {
   const dateKeys = getRecentDateKeys(10);
-  const [currentModifiedReports, setCurrentModifiedReports] = useState(modifiedReports);
-  const allSubmittedReports = MEMBERS.map((username) => ({
-    username,
-    report: reportsByMember[username],
-  })).filter(
-    ({ report }) => report !== undefined && report.content.trim().length > 0,
+  const [currentModifiedReports, setCurrentModifiedReports] =
+    useState(modifiedReports);
+  const allSubmittedReports = useMemo(
+    () =>
+      MEMBERS.map((username) => ({
+        username,
+        report: reportsByMember[username],
+      })).filter(
+        ({ report }) => report !== undefined && report.content.trim().length > 0,
+      ),
+    [reportsByMember]
   );
-  const leaveMembersOnDate = allSubmittedReports.flatMap(({ username, report }) => {
-    const trimmed = report.content.trim();
-    if (!isLeaveContent(trimmed)) return [];
-    return [{ username, type: trimmed }];
-  });
-  const submittedReports = allSubmittedReports.filter(
-    ({ report }) => !isLeaveContent(report.content.trim()),
+  const leaveMembersOnDate = useMemo(
+    () =>
+      allSubmittedReports.flatMap(({ username, report }) => {
+        const trimmed = report.content.trim();
+        if (!isLeaveContent(trimmed)) return [];
+        return [{ username, type: trimmed }];
+      }),
+    [allSubmittedReports]
+  );
+  const submittedReports = useMemo(
+    () =>
+      allSubmittedReports.filter(
+        ({ report }) => !isLeaveContent(report.content.trim()),
+      ),
+    [allSubmittedReports]
+  );
+  const submittedReportList = useMemo(
+    () =>
+      submittedReports.map((r) => ({
+        username: r.username,
+        content: r.report.content,
+      })),
+    [submittedReports]
   );
   const [modifiedReportModal, setModifiedReportModal] =
     useState<ModifiedReportItem | null>(null);
@@ -111,6 +136,45 @@ export default function ReadReportContent({
   const [memberSummaryModalOpen, setMemberSummaryModalOpen] = useState(false);
   const [riskRadarModalOpen, setRiskRadarModalOpen] = useState(false);
   const [workloadModalOpen, setWorkloadModalOpen] = useState(false);
+  const [pendingNoticeModalOpen, setPendingNoticeModalOpen] = useState(false);
+  const [pendingNoticeMessage, setPendingNoticeMessage] = useState("");
+
+  // AI 프로젝트별 정리, 리스크 레이더 및 업무 비중 분석 선행 호출 (30분 주기 자동 최신화)
+  const aiPrefetch = useAiReportPrefetch(selectedDate, submittedReportList);
+
+  const handleOpenProjectSummary = () => {
+    if (submittedReports.length === 0) return;
+    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
+    if (aiPrefetch.projectSummary.data || aiPrefetch.projectSummary.error) {
+      setProjectSummaryModalOpen(true);
+      return;
+    }
+    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
+    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
+    setPendingNoticeModalOpen(true);
+  };
+
+  const handleOpenRiskRadar = () => {
+    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
+    if (aiPrefetch.riskRadar.data || aiPrefetch.riskRadar.error) {
+      setRiskRadarModalOpen(true);
+      return;
+    }
+    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
+    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
+    setPendingNoticeModalOpen(true);
+  };
+
+  const handleOpenWorkload = () => {
+    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
+    if (aiPrefetch.workload.data || aiPrefetch.workload.error) {
+      setWorkloadModalOpen(true);
+      return;
+    }
+    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
+    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
+    setPendingNoticeModalOpen(true);
+  };
 
   const handleCopyAll = async () => {
     if (submittedReports.length === 0) {
@@ -131,8 +195,13 @@ export default function ReadReportContent({
   };
 
   const confirmModification = async (id: string) => {
-    if (!confirm("이 보고서의 수정을 확인 완료 처리하시겠습니까?\n리스트에서 제외됩니다.")) return;
-    
+    if (
+      !confirm(
+        "이 보고서의 수정을 확인 완료 처리하시겠습니까?\n리스트에서 제외됩니다.",
+      )
+    )
+      return;
+
     try {
       const res = await fetch("/api/report/confirm-modification", {
         method: "POST",
@@ -140,7 +209,9 @@ export default function ReadReportContent({
         body: JSON.stringify({ id }),
       });
       if (res.ok) {
-        setCurrentModifiedReports((prev) => prev.filter((item) => item.id !== id));
+        setCurrentModifiedReports((prev) =>
+          prev.filter((item) => item.id !== id),
+        );
       } else {
         const data = await res.json();
         alert(data.error ?? "처리에 실패했습니다.");
@@ -155,35 +226,56 @@ export default function ReadReportContent({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">일일 보고 현황</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            날짜를 클릭하면 해당 날짜의 팀원별 보고를 볼 수 있습니다.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setRiskRadarModalOpen(true)}
+            onClick={handleOpenRiskRadar}
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-rose-700 hover:via-red-700 hover:to-rose-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
             title="최근 보고서를 분석하여 잠재적 지연/장애 리스크를 조기 감지합니다"
           >
             <span className="text-base">🚨</span>
             <span>AI 리스크 레이더</span>
-            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-              위험 감지
-            </span>
+            {aiPrefetch.riskRadar.isLoading ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                분석 중...
+              </span>
+            ) : aiPrefetch.riskRadar.data ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-semibold text-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                준비 완료
+              </span>
+            ) : (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+                위험 감지
+              </span>
+            )}
           </button>
 
           <button
             type="button"
-            onClick={() => setWorkloadModalOpen(true)}
+            onClick={handleOpenWorkload}
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-teal-700 hover:via-emerald-700 hover:to-teal-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
             title="프로젝트별 투입 공수 및 팀원별 업무 비중을 시각화합니다"
           >
             <span className="text-base">📊</span>
             <span>업무 비중 분석</span>
-            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-              공수 통계
-            </span>
+            {aiPrefetch.workload.isLoading ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                분석 중...
+              </span>
+            ) : aiPrefetch.workload.data ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-semibold text-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                준비 완료
+              </span>
+            ) : (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+                공수 통계
+              </span>
+            )}
           </button>
 
           <button
@@ -281,7 +373,7 @@ export default function ReadReportContent({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setProjectSummaryModalOpen(true)}
+              onClick={handleOpenProjectSummary}
               disabled={submittedReports.length === 0}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 border cursor-pointer ${
                 submittedReports.length === 0
@@ -304,56 +396,67 @@ export default function ReadReportContent({
                 />
               </svg>
               <span>AI 프로젝트별 정리</span>
+              {aiPrefetch.projectSummary.isLoading ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-200/70 px-1.5 py-0.2 text-[10px] font-medium text-purple-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse" />
+                  분석 중...
+                </span>
+              ) : aiPrefetch.projectSummary.data ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                  준비 완료
+                </span>
+              ) : null}
             </button>
 
             <button
               type="button"
               onClick={handleCopyAll}
               disabled={submittedReports.length === 0}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
-              submittedReports.length === 0
-                ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
-                : isCopied
-                ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm cursor-pointer"
-                : "bg-white border-indigo-600 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm active:bg-indigo-100 cursor-pointer"
-            }`}
-          >
-            {isCopied ? (
-              <>
-                <svg
-                  className="w-3.5 h-3.5 text-emerald-600 animate-pulse"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                복사 완료!
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-3.5 h-3.5 text-indigo-600"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 3h6"
-                  />
-                </svg>
-                전체 내역 복사
-              </>
-            )}
-          </button>
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
+                submittedReports.length === 0
+                  ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                  : isCopied
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm cursor-pointer"
+                    : "bg-white border-indigo-600 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm active:bg-indigo-100 cursor-pointer"
+              }`}
+            >
+              {isCopied ? (
+                <>
+                  <svg
+                    className="w-3.5 h-3.5 text-emerald-600 animate-pulse"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  복사 완료!
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-3.5 h-3.5 text-indigo-600"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 3h6"
+                    />
+                  </svg>
+                  전체 내역 복사
+                </>
+              )}
+            </button>
           </div>
         </div>
         <p className="mb-5 text-sm text-gray-600">
@@ -546,23 +649,86 @@ export default function ReadReportContent({
         isOpen={projectSummaryModalOpen}
         onClose={() => setProjectSummaryModalOpen(false)}
         selectedDate={selectedDate}
-        reports={submittedReports.map((r) => ({
-          username: r.username,
-          content: r.report.content,
-        }))}
+        reports={submittedReportList}
+        data={aiPrefetch.projectSummary.data}
+        isLoading={aiPrefetch.projectSummary.isLoading}
+        error={aiPrefetch.projectSummary.error}
+        updatedAt={aiPrefetch.projectSummary.updatedAt}
+        onRefresh={aiPrefetch.projectSummary.refresh}
       />
 
       {/* AI 프로젝트 리스크 레이더 모달 */}
       <ReportRiskRadarModal
         isOpen={riskRadarModalOpen}
         onClose={() => setRiskRadarModalOpen(false)}
+        data={aiPrefetch.riskRadar.data}
+        isLoading={aiPrefetch.riskRadar.isLoading}
+        error={aiPrefetch.riskRadar.error}
+        updatedAt={aiPrefetch.riskRadar.updatedAt}
+        onRefresh={aiPrefetch.riskRadar.refresh}
       />
 
       {/* 팀 업무 비중 및 공수 분석 모달 */}
       <ReportWorkloadModal
         isOpen={workloadModalOpen}
         onClose={() => setWorkloadModalOpen(false)}
+        data={aiPrefetch.workload.data}
+        isLoading={aiPrefetch.workload.isLoading}
+        error={aiPrefetch.workload.error}
+        updatedAt={aiPrefetch.workload.updatedAt}
+        onRefresh={aiPrefetch.workload.refresh}
       />
+
+      {/* AI 분석 진행 중 안내 팝업창 */}
+      {pendingNoticeModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
+          onClick={() => setPendingNoticeModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-gray-100 text-center space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 shadow-xs">
+              <svg
+                className="h-7 w-7 animate-spin text-amber-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="text-base font-bold text-gray-900">
+                AI 분석 준비 중
+              </h4>
+              <p className="text-sm font-semibold text-gray-700 leading-relaxed">
+                {pendingNoticeMessage}
+              </p>
+              <p className="text-xs text-gray-400 pt-1">
+                사내 AI가 최근 보고서를 분석하고 있습니다.
+                <br />
+                분석이 완료되면 즉시 열람하실 수 있습니다.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPendingNoticeModalOpen(false)}
+              className="w-full rounded-xl bg-gray-900 py-2.5 text-xs font-semibold text-white hover:bg-gray-800 transition-colors shadow-xs cursor-pointer"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

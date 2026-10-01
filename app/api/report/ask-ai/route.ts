@@ -72,8 +72,17 @@ export async function POST(request: NextRequest) {
     const startDateTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
     const endDateTime = new Date(ey, em - 1, ed, 23, 59, 59, 999);
 
-    // 1. 질문에서 팀원 이름 탐색
-    const matchedMember = MEMBERS.find((m) => trimmedQuestion.includes(m));
+    const targetMember =
+      typeof body?.member === "string" && body.member.trim()
+        ? body.member.trim()
+        : typeof body?.username === "string" && body.username.trim()
+          ? body.username.trim()
+          : null;
+
+    // 1. 질문에서 팀원 이름 탐색 (targetMember 미지정 시 사용)
+    const matchedMember = !targetMember
+      ? MEMBERS.find((m) => trimmedQuestion.includes(m))
+      : null;
 
     // 2. 질문에서 핵심 검색 키워드 추출
     const keywords = extractSearchKeywords(trimmedQuestion);
@@ -86,7 +95,57 @@ export async function POST(request: NextRequest) {
 
     let matchedReports: ReportItem[] = [];
 
-    if (matchedMember) {
+    if (targetMember) {
+      // ⭐️ [중요] 특정 팀원 전용 모드: 해당 팀원의 보고서만 엄격히 조회
+      if (keywords.length > 0) {
+        matchedReports = await prisma.content.findMany({
+          where: {
+            username: targetMember,
+            content: { not: null },
+            created_at: {
+              gte: startDateTime,
+              lte: endDateTime,
+            },
+            OR: keywords.map((kw) => ({
+              content: { contains: kw, mode: "insensitive" },
+            })),
+          },
+          orderBy: { created_at: "desc" },
+          take: 15,
+          select: { username: true, content: true, created_at: true },
+        });
+      }
+
+      // 키워드 결과가 적거나 없으면 해당 팀원의 최근 보고서로 보충
+      if (matchedReports.length < 5) {
+        const memberRecentReports = await prisma.content.findMany({
+          where: {
+            username: targetMember,
+            content: { not: null },
+            created_at: {
+              gte: startDateTime,
+              lte: endDateTime,
+            },
+          },
+          orderBy: { created_at: "desc" },
+          take: 15,
+          select: { username: true, content: true, created_at: true },
+        });
+
+        const existingKeys = new Set(
+          matchedReports.map((r) => `${r.username}-${r.created_at.getTime()}`)
+        );
+
+        for (const r of memberRecentReports) {
+          const key = `${r.username}-${r.created_at.getTime()}`;
+          if (!existingKeys.has(key)) {
+            matchedReports.push(r);
+            existingKeys.add(key);
+          }
+          if (matchedReports.length >= 15) break;
+        }
+      }
+    } else if (matchedMember) {
       // 1순위: 특정 팀원 언급 시 지정된 기간 내에서 해당 팀원의 보고서 최신순 조회
       matchedReports = await prisma.content.findMany({
         where: {
@@ -119,8 +178,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. 만약 검색 결과가 4개 미만이면, 지정 기간 내 최신 보고서로 보충 (팀 전체 현황 파악 목적)
-    if (matchedReports.length < 4) {
+    // 3. (전체 모드일 때만) 검색 결과가 4개 미만이면, 팀 전체 최신 보고서로 보충
+    if (!targetMember && matchedReports.length < 4) {
       const recentReports = await prisma.content.findMany({
         where: {
           content: { not: null },
@@ -154,9 +213,10 @@ export async function POST(request: NextRequest) {
     );
 
     if (validReports.length === 0) {
+      const targetLabel = targetMember ? `${targetMember} 님의 ` : "";
       return NextResponse.json(
         {
-          error: `설정하신 기간(${startDate} ~ ${endDate}) 내에 조회 가능한 보고서 데이터가 없습니다.`,
+          error: `설정하신 기간(${startDate} ~ ${endDate}) 내에 ${targetLabel}조회 가능한 보고서 데이터가 없습니다.`,
         },
         { status: 404 }
       );
@@ -184,7 +244,28 @@ export async function POST(request: NextRequest) {
       })
       .join("\n\n---\n\n");
 
-    const prompt = `
+    const prompt = targetMember
+      ? `
+### Role
+너는 사내 업무 보고서를 기반으로 질문에 답변하는 스마트 AI 업무 비서이다.
+현재 분석 및 답변 대상 팀원은 [${targetMember}] 님이다.
+반드시 한국어로 친절하고 명확하게 비즈니스 톤으로 답변해라.
+
+### Guidelines
+1. 반드시 아래 [${targetMember} 님의 사내 보고서 데이터 (조회 기간: ${startDate} ~ ${endDate})]에 기록된 실제 내용에만 기반해서 답변해라.
+2. 설정된 기간(${startDate} ~ ${endDate}) 내 [${targetMember}] 님의 보고서에 없는 내용은 절대 거짓으로 지어내지 마라. 내용이 없다면 "설정된 기간(${startDate} ~ ${endDate}) 내 ${targetMember} 님의 보고서 기록에서는 해당 내용을 찾을 수 없습니다."라고 분명하게 밝혀라.
+3. 답변할 때는 보고 날짜(예: 9월 12일)와 관련 프로젝트/업무를 함께 언급하여 근거를 명확히 제시해라.
+4. 한눈에 읽기 편하도록 간결하고 가독성 좋은 개조식(글머리 기호) 또는 단락으로 정리해라.
+
+### ${targetMember} 님의 사내 보고서 데이터 (조회 기간: ${startDate} ~ ${endDate})
+${contextData}
+
+### 질문
+${trimmedQuestion}
+
+### 답변:
+`
+      : `
 ### Role
 너는 사내 업무 보고서를 기반으로 질문에 답변하는 스마트 AI 업무 비서이다.
 반드시 한국어로 친절하고 명확하게 비즈니스 톤으로 답변해라.

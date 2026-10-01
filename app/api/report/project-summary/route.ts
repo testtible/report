@@ -52,26 +52,54 @@ ${formattedReports}
       body: JSON.stringify({
         model: getAiModel(),
         prompt,
-        stream: false,
+        stream: true,
         options: {
           num_ctx: 8192,
+          num_predict: 1200,
           temperature: 0.3,
         },
       }),
     });
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       const errorText = await response.text().catch(() => "");
-      console.error("프로젝트별 취합 에러:", errorText);
+      console.error("프로젝트별 취합 에러:", response.status, errorText);
       return NextResponse.json(
-        { error: "AI 서버 응답에 실패했습니다." },
+        { error: `AI 서버 응답에 실패했습니다. (${response.status})` },
         { status: 500 }
       );
     }
 
-    const data = (await response.json()) as { response?: string };
-    const summary = data.response?.trim() || "";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let rawText = "";
+    let buffer = "";
 
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.response) {
+            rawText += parsed.response;
+          }
+          if (parsed.done) {
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    const summary = rawText.trim();
     return NextResponse.json({ summary });
   } catch (error) {
     console.error("프로젝트 취합 처리 오류:", error);
