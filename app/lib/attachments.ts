@@ -13,6 +13,7 @@ export type MemberReport = {
   content: string;
   attachmentName: string | null;
   attachmentSize: number | null;
+  masterComment?: string | null;
 };
 
 export function formatFileSize(bytes: number): string {

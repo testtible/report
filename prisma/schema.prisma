@@ -18,4 +18,5 @@ model content {
   attachment_mime_type String?
   attachment_size      Int?
   attachment_data      Bytes?
+  master_comment       String?
 }

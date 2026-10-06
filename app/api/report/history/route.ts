@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       id: true,
       created_at: true,
       content: true,
+      master_comment: true,
     },
   });
 
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       id: r.id.toString(),
       created_at: r.created_at.toISOString(),
       content: r.content ?? "",
+      masterComment: r.master_comment ?? null,
     })),
   });
 }

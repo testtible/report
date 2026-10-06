@@ -48,9 +48,10 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
       content: string | null;
       attachment_name: string | null;
       attachment_size: number | null;
+      master_comment: string | null;
     }[]
   >`
-    SELECT id, username, content, attachment_name, attachment_size
+    SELECT id, username, content, attachment_name, attachment_size, master_comment
     FROM content
     WHERE created_at >= ${start} AND created_at <= ${end}
     ORDER BY created_at DESC
@@ -64,6 +65,7 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
         content: r.content ?? "",
         attachmentName: r.attachment_name,
         attachmentSize: r.attachment_size,
+        masterComment: r.master_comment,
       };
     }
   }

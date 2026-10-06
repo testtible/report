@@ -16,6 +16,7 @@ export async function findReportByDate(
       content: string | null;
       attachment_name: string | null;
       attachment_size: number | null;
+      master_comment: string | null;
     }
   | undefined
 > {
@@ -25,9 +26,10 @@ export async function findReportByDate(
       content: string | null;
       attachment_name: string | null;
       attachment_size: number | null;
+      master_comment: string | null;
     }[]
   >`
-    SELECT id, content, attachment_name, attachment_size
+    SELECT id, content, attachment_name, attachment_size, master_comment
     FROM content
     WHERE username = ${username}
       AND created_at >= ${start}
@@ -113,5 +115,16 @@ export async function updateReport(
       attachment_size = NULL,
       attachment_data = NULL
     WHERE id = ${existing.id}
+  `;
+}
+
+export async function updateMasterComment(
+  id: bigint,
+  masterComment: string | null,
+): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE content
+    SET master_comment = ${masterComment}
+    WHERE id = ${id}
   `;
 }

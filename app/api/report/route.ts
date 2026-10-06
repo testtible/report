@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
     attachmentSize: report?.attachment_size ?? null,
     hasAttachment: !!report?.attachment_name,
     previousReport,
+    masterComment: report?.master_comment ?? null,
   });
 }
 

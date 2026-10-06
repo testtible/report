@@ -45,6 +45,7 @@ export default function Home() {
     content: string;
     date: string;
   } | null>(null);
+  const [masterComment, setMasterComment] = useState<string | null>(null);
   const [draftBackup, setDraftBackup] = useState<{
     content: string;
     savedAt: string;
@@ -147,6 +148,7 @@ export default function Home() {
       setPreviousReportData(null);
       setDraftBackup(null);
       setLastSavedTime(null);
+      setMasterComment(null);
       resetAttachmentState();
       return;
     }
@@ -164,6 +166,7 @@ export default function Home() {
           setReportContent("");
           setIsExistingReport(false);
           setPreviousReportData(null);
+          setMasterComment(null);
           resetAttachmentState();
           return;
         }
@@ -176,6 +179,7 @@ export default function Home() {
         setExistingAttachmentName(data.attachmentName ?? null);
         setExistingAttachmentSize(data.attachmentSize ?? null);
         setPreviousReportData(data.previousReport ?? null);
+        setMasterComment(data.masterComment ?? null);
 
         // 임시 저장본(로컬 백업) 확인
         const draftKey = `aerix_report_draft_${selectedMember}_${selectedDate}`;
@@ -222,6 +226,7 @@ export default function Home() {
         if (!cancelled) {
           setReportContent("");
           setIsExistingReport(false);
+          setMasterComment(null);
           resetAttachmentState();
         }
       } finally {
@@ -481,6 +486,26 @@ export default function Home() {
                 ))}
               </select>
             </div>
+
+            {/* 관리자 피드백 / 코멘트 (존재할 경우 표시) */}
+            {selectedMember && masterComment && !isLoadingContent && (
+              <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-purple-50/60 to-blue-50/90 p-4 shadow-xs">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white text-xs">
+                    💬
+                  </span>
+                  <span className="text-xs font-bold text-indigo-900">
+                    관리자(마스터) 코멘트
+                  </span>
+                  <span className="text-[11px] text-indigo-500">
+                    · 해당 보고서에 남겨진 피드백입니다
+                  </span>
+                </div>
+                <div className="text-sm text-black whitespace-pre-wrap pl-8 leading-relaxed">
+                  {masterComment}
+                </div>
+              </div>
+            )}
 
             {/* 보고 내용 */}
             <div>

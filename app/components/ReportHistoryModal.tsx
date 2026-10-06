@@ -6,6 +6,7 @@ type ReportItem = {
   id: string;
   created_at: string;
   content: string;
+  masterComment?: string | null;
 };
 
 function toLocalDateKey(iso: string): string {
@@ -218,6 +219,16 @@ export default function ReportHistoryModal({
                   <div className="flex-1 overflow-y-auto rounded-xl bg-gray-50 p-4 text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">
                     {selectedReport.content || "작성된 내용이 없습니다."}
                   </div>
+                  {selectedReport.masterComment && (
+                    <div className="mt-3 shrink-0 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-sm">
+                      <p className="text-xs font-semibold text-indigo-800 mb-1 flex items-center gap-1">
+                        <span>💬</span> 관리자 코멘트
+                      </p>
+                      <p className="text-black whitespace-pre-wrap text-sm leading-relaxed">
+                        {selectedReport.masterComment}
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </div>
