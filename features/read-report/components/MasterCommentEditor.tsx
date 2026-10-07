@@ -94,14 +94,20 @@ export default function MasterCommentEditor({
           </button>
         </div>
       ) : (
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="text-sm">💬</span>
+            <span className="text-[11px] sm:text-xs font-medium text-gray-500">
+              팀원에게 이쁜 피드백을 남겨보세요 :)
+            </span>
+          </div>
           <button
             type="button"
             onClick={onStartEdit}
-            className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-600 hover:underline cursor-pointer"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-xs hover:shadow-md cursor-pointer"
           >
             <svg
-              className="w-3.5 h-3.5"
+              className="w-3.5 h-3.5 stroke-[2.5]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -109,7 +115,6 @@ export default function MasterCommentEditor({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
                 d="M12 4v16m8-8H4"
               />
             </svg>
