@@ -1,37 +1,33 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
-import ReportAttachmentLink from "@/app/components/ReportAttachmentLink";
+import { useMemo } from "react";
 import type { MemberReport } from "@/app/lib/attachments";
-import { getLeaveTypeColor } from "@/app/lib/leave";
-import {
-  formatModifiedReportDate,
-  type ModifiedReportItem,
-} from "@/app/lib/modifiedReports";
+import { type ModifiedReportItem } from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
+import { useAiReportPrefetch } from "@/app/read-report/useAiReportPrefetch";
+
+// Modals
 import ReportAiChatModal from "@/app/components/ReportAiChatModal";
 import ProjectSummaryModal from "@/app/components/ProjectSummaryModal";
 import MemberSummaryModal from "@/app/components/MemberSummaryModal";
 import ReportRiskRadarModal from "@/app/components/ReportRiskRadarModal";
 import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
-import MarkdownView from "@/app/components/MarkdownView";
-import { useAiReportPrefetch } from "@/app/read-report/useAiReportPrefetch";
 
-function formatDateLabel(dateKey: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const week = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
-  const today = new Date();
-  const isToday =
-    today.getFullYear() === y &&
-    today.getMonth() === m - 1 &&
-    today.getDate() === d;
-  if (isToday) return `오늘 (${week})`;
-  return `${m}/${d} (${week})`;
-}
+// Sub-components
+import ReadReportHeader from "@/features/read-report/components/ReadReportHeader";
+import DateSelectStrip from "@/features/read-report/components/DateSelectStrip";
+import SubmittedReportCard from "@/features/read-report/components/SubmittedReportCard";
+import LeaveMembersSection from "@/features/read-report/components/LeaveMembersSection";
+import ModifiedReportsSection from "@/features/read-report/components/ModifiedReportsSection";
+import PendingNoticeModal from "@/features/read-report/components/PendingNoticeModal";
 
-/** 주말 제외, 이전 평일 count개 날짜 (오늘 포함 가능) */
+// Custom Hooks
+import { useMasterComment } from "@/features/read-report/hooks/useMasterComment";
+import { useCopyReports } from "@/features/read-report/hooks/useCopyReports";
+import { useAiModals } from "@/features/read-report/hooks/useAiModals";
+import { useModifiedReports } from "@/features/read-report/hooks/useModifiedReports";
+
+/** 주말 제외, 이전 평일 count개 날짜 계산 (오늘 포함) */
 function getRecentDateKeys(count: number): string[] {
   const keys: string[] = [];
   const d = new Date();
@@ -55,45 +51,14 @@ type Props = {
   modifiedReports: ModifiedReportItem[];
 };
 
-function ReportStatusBadge({ content }: { content: string | undefined }) {
-  const hasReport = content !== undefined && content.trim().length > 0;
-
-  if (!hasReport) {
-    return (
-      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-        미제출
-      </span>
-    );
-  }
-
-  const trimmed = content.trim();
-  if (isLeaveContent(trimmed)) {
-    const colors = getLeaveTypeColor(trimmed);
-    return (
-      <span
-        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
-      >
-        {trimmed}
-      </span>
-    );
-  }
-
-  return (
-    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-      제출완료
-    </span>
-  );
-}
-
 export default function ReadReportContent({
   selectedDate,
   reportsByMember,
-  scheduledLeaveByMember,
-  modifiedReports,
+  modifiedReports: initialModifiedReports,
 }: Props) {
-  const dateKeys = getRecentDateKeys(10);
-  const [currentModifiedReports, setCurrentModifiedReports] =
-    useState(modifiedReports);
+  const dateKeys = useMemo(() => getRecentDateKeys(10), []);
+
+  // 1. 제출된 보고서 데이터 분류 계산
   const allSubmittedReports = useMemo(
     () =>
       MEMBERS.map((username) => ({
@@ -102,8 +67,9 @@ export default function ReadReportContent({
       })).filter(
         ({ report }) => report !== undefined && report.content.trim().length > 0,
       ),
-    [reportsByMember]
+    [reportsByMember],
   );
+
   const leaveMembersOnDate = useMemo(
     () =>
       allSubmittedReports.flatMap(({ username, report }) => {
@@ -111,301 +77,64 @@ export default function ReadReportContent({
         if (!isLeaveContent(trimmed)) return [];
         return [{ username, type: trimmed }];
       }),
-    [allSubmittedReports]
+    [allSubmittedReports],
   );
+
   const submittedReports = useMemo(
     () =>
       allSubmittedReports.filter(
         ({ report }) => !isLeaveContent(report.content.trim()),
       ),
-    [allSubmittedReports]
+    [allSubmittedReports],
   );
+
   const submittedReportList = useMemo(
     () =>
       submittedReports.map((r) => ({
         username: r.username,
         content: r.report.content,
       })),
-    [submittedReports]
+    [submittedReports],
   );
-  const [modifiedReportModal, setModifiedReportModal] =
-    useState<ModifiedReportItem | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const [aiChatModalOpen, setAiChatModalOpen] = useState(false);
-  const [projectSummaryModalOpen, setProjectSummaryModalOpen] = useState(false);
-  const [memberSummaryModalOpen, setMemberSummaryModalOpen] = useState(false);
-  const [riskRadarModalOpen, setRiskRadarModalOpen] = useState(false);
-  const [workloadModalOpen, setWorkloadModalOpen] = useState(false);
-  const [pendingNoticeModalOpen, setPendingNoticeModalOpen] = useState(false);
-  const [pendingNoticeMessage, setPendingNoticeMessage] = useState("");
 
-  // 관리자(마스터) 코멘트 상태
-  const [commentOverrides, setCommentOverrides] = useState<Record<string, string>>({});
-  const [editingCommentMember, setEditingCommentMember] = useState<string | null>(null);
-  const [commentInput, setCommentInput] = useState("");
-  const [isSavingComment, setIsSavingComment] = useState(false);
-
-  const handleStartEditComment = (username: string, initialComment: string) => {
-    setEditingCommentMember(username);
-    setCommentInput(initialComment);
-  };
-
-  const handleCancelEditComment = () => {
-    setEditingCommentMember(null);
-    setCommentInput("");
-  };
-
-  const handleSaveComment = async (reportId: string, username: string) => {
-    setIsSavingComment(true);
-    try {
-      const res = await fetch("/api/report/master-comment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: reportId, masterComment: commentInput }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(
-          data.details
-            ? `${data.error}\n(${data.details})`
-            : data.error || "코멘트 저장에 실패했습니다.",
-        );
-        return;
-      }
-      setCommentOverrides((prev) => ({
-        ...prev,
-        [username]: commentInput.trim(),
-      }));
-      setEditingCommentMember(null);
-      setCommentInput("");
-    } catch {
-      alert("네트워크 오류가 발생했습니다.");
-    } finally {
-      setIsSavingComment(false);
-    }
-  };
-
-  // AI 프로젝트별 정리, 리스크 레이더 및 업무 비중 분석 선행 호출 (30분 주기 자동 최신화)
+  // 2. AI 보고서 프리페치 (30분 주기 캐시)
   const aiPrefetch = useAiReportPrefetch(selectedDate, submittedReportList);
 
-  const handleOpenProjectSummary = () => {
-    if (submittedReports.length === 0) return;
-    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
-    if (aiPrefetch.projectSummary.data || aiPrefetch.projectSummary.error) {
-      setProjectSummaryModalOpen(true);
-      return;
-    }
-    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
-    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
-    setPendingNoticeModalOpen(true);
-  };
+  // 3. 도메인별 커스텀 훅 결합
+  const aiModals = useAiModals({
+    projectSummary: aiPrefetch.projectSummary,
+    riskRadar: aiPrefetch.riskRadar,
+    workload: aiPrefetch.workload,
+  });
 
-  const handleOpenRiskRadar = () => {
-    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
-    if (aiPrefetch.riskRadar.data || aiPrefetch.riskRadar.error) {
-      setRiskRadarModalOpen(true);
-      return;
-    }
-    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
-    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
-    setPendingNoticeModalOpen(true);
-  };
-
-  const handleOpenWorkload = () => {
-    // 단 한번이라도 API 호출이 되어 데이터가 존재하는 경우 자유롭게 진입 가능
-    if (aiPrefetch.workload.data || aiPrefetch.workload.error) {
-      setWorkloadModalOpen(true);
-      return;
-    }
-    // 아직 한 번도 데이터가 준비되지 않은 상태면 안내 팝업창 표시 (모달 진입 차단)
-    setPendingNoticeMessage("AI가 분석을 진행 중입니다. 잠시만 기다려주세요.");
-    setPendingNoticeModalOpen(true);
-  };
-
-  const handleCopyAll = async () => {
-    if (submittedReports.length === 0) {
-      alert("복사할 제출 내역이 없습니다.");
-      return;
-    }
-    const textToCopy = submittedReports
-      .map(({ username, report }) => `${username}\n${report.content}`)
-      .join("\n\n");
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy: ", err);
-      alert("복사에 실패했습니다.");
-    }
-  };
-
-  const confirmModification = async (id: string) => {
-    if (
-      !confirm(
-        "이 보고서의 수정을 확인 완료 처리하시겠습니까?\n리스트에서 제외됩니다.",
-      )
-    )
-      return;
-
-    try {
-      const res = await fetch("/api/report/confirm-modification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (res.ok) {
-        setCurrentModifiedReports((prev) =>
-          prev.filter((item) => item.id !== id),
-        );
-      } else {
-        const data = await res.json();
-        alert(data.error ?? "처리에 실패했습니다.");
-      }
-    } catch {
-      alert("네트워크 오류가 발생했습니다.");
-    }
-  };
+  const masterComment = useMasterComment();
+  const copyReports = useCopyReports(submittedReportList);
+  const modifiedReportsManager = useModifiedReports(initialModifiedReports);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">일일 보고 현황</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleOpenRiskRadar}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-rose-700 hover:via-red-700 hover:to-rose-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-            title="최근 보고서를 분석하여 잠재적 지연/장애 리스크를 조기 감지합니다"
-          >
-            <span className="text-base">🚨</span>
-            <span>AI 리스크 레이더</span>
-            {aiPrefetch.riskRadar.isLoading ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                분석 중...
-              </span>
-            ) : aiPrefetch.riskRadar.data ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-semibold text-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                준비 완료
-              </span>
-            ) : (
-              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-                위험 감지
-              </span>
-            )}
-          </button>
+      {/* 1. 상단 액션 바 (AI 리스크/공수/요약/비서) */}
+      <ReadReportHeader
+        riskRadar={{
+          isLoading: aiPrefetch.riskRadar.isLoading,
+          data: aiPrefetch.riskRadar.data,
+        }}
+        workload={{
+          isLoading: aiPrefetch.workload.isLoading,
+          data: aiPrefetch.workload.data,
+        }}
+        onOpenRiskRadar={aiModals.actions.openRiskRadar}
+        onOpenWorkload={aiModals.actions.openWorkload}
+        onOpenMemberSummary={() =>
+          aiModals.actions.setMemberSummaryModalOpen(true)
+        }
+        onOpenAiChat={() => aiModals.actions.setAiChatModalOpen(true)}
+      />
 
-          <button
-            type="button"
-            onClick={handleOpenWorkload}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-teal-700 hover:via-emerald-700 hover:to-teal-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-            title="프로젝트별 투입 공수 및 팀원별 업무 비중을 시각화합니다"
-          >
-            <span className="text-base">📊</span>
-            <span>업무 비중 분석</span>
-            {aiPrefetch.workload.isLoading ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                분석 중...
-              </span>
-            ) : aiPrefetch.workload.data ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/25 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-semibold text-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                준비 완료
-              </span>
-            ) : (
-              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-                공수 통계
-              </span>
-            )}
-          </button>
+      {/* 2. 날짜 선택 스트립 */}
+      <DateSelectStrip selectedDate={selectedDate} dateKeys={dateKeys} />
 
-          <button
-            type="button"
-            onClick={() => setMemberSummaryModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-purple-700 hover:via-indigo-700 hover:to-purple-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4 text-purple-200"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <span>최근 보고 요약</span>
-            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-              5일 취합
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAiChatModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-800 transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4 text-amber-300 animate-pulse"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            <span>AI 질문 비서</span>
-            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-              사내 LLM
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* 날짜 선택 스트립 */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <p className="text-xs font-medium text-gray-500 mb-3">날짜 선택</p>
-        <div className="flex flex-wrap gap-2">
-          {dateKeys.map((dateKey) => {
-            const isSelected = dateKey === selectedDate;
-            return (
-              <Link
-                key={dateKey}
-                href={`/read-report?date=${dateKey}`}
-                className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isSelected
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {formatDateLabel(dateKey)}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 선택된 날짜 표시 */}
-      <p className="text-gray-600">
-        <span className="font-semibold text-gray-900">
-          {formatDateLabel(selectedDate)}
-        </span>
-        <span className="ml-2 text-gray-500">{selectedDate}</span>
-      </p>
-
-      {/* 통합 보고 섹션 */}
+      {/* 3. 오늘의 보고 리스트 섹션 */}
       <section className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -416,10 +145,14 @@ export default function ReadReportContent({
               제출 {submittedReports.length}명
             </span>
           </div>
+
           <div className="flex items-center gap-2">
+            {/* AI 프로젝트별 정리 버튼 */}
             <button
               type="button"
-              onClick={handleOpenProjectSummary}
+              onClick={() =>
+                aiModals.actions.openProjectSummary(submittedReports.length > 0)
+              }
               disabled={submittedReports.length === 0}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 border cursor-pointer ${
                 submittedReports.length === 0
@@ -455,19 +188,20 @@ export default function ReadReportContent({
               ) : null}
             </button>
 
+            {/* 전체 내역 복사 버튼 */}
             <button
               type="button"
-              onClick={handleCopyAll}
+              onClick={copyReports.copyAllReports}
               disabled={submittedReports.length === 0}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
                 submittedReports.length === 0
                   ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
-                  : isCopied
+                  : copyReports.isCopied
                     ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm cursor-pointer"
                     : "bg-white border-indigo-600 text-indigo-600 hover:bg-indigo-50 hover:shadow-sm active:bg-indigo-100 cursor-pointer"
               }`}
             >
-              {isCopied ? (
+              {copyReports.isCopied ? (
                 <>
                   <svg
                     className="w-3.5 h-3.5 text-emerald-600 animate-pulse"
@@ -505,6 +239,7 @@ export default function ReadReportContent({
             </button>
           </div>
         </div>
+
         <p className="mb-5 text-sm text-gray-600">
           미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
         </p>
@@ -515,280 +250,70 @@ export default function ReadReportContent({
           </div>
         ) : (
           <div className="space-y-4">
+            {/* 제출된 개별 팀원 보고서 카드 목록 */}
             {submittedReports.map(({ username, report }) => {
-              const currentComment =
-                username in commentOverrides
-                  ? commentOverrides[username]
-                  : (report.masterComment ?? "");
-              const isEditingThis = editingCommentMember === username;
+              const currentComment = masterComment.getEffectiveComment(
+                username,
+                report.masterComment,
+              );
+              const isEditingThis =
+                masterComment.editingCommentMember === username;
 
               return (
-                <article
+                <SubmittedReportCard
                   key={username}
-                  className="rounded-xl border border-gray-200 bg-gray-50 p-4"
-                >
-                  <p className="mb-2 text-sm font-semibold text-gray-900">
-                    {username}
-                  </p>
-                  <div className="text-sm leading-relaxed text-gray-800">
-                    <MarkdownView content={report.content} />
-                  </div>
-                  {report.attachmentName && (
-                    <div className="mt-3">
-                      <ReportAttachmentLink
-                        reportId={report.id}
-                        fileName={report.attachmentName}
-                        fileSize={report.attachmentSize}
-                      />
-                    </div>
-                  )}
-
-                  {/* 마스터 코멘트 섹션 */}
-                  <div className="mt-3 pt-3 border-t border-gray-200/80">
-                    {isEditingThis ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-indigo-700 flex items-center gap-1">
-                            <span>💬</span> 관리자 코멘트 작성 / 수정
-                          </label>
-                          <span className="text-[11px] text-gray-400">
-                            비워두고 저장 시 삭제됩니다
-                          </span>
-                        </div>
-                        <textarea
-                          rows={2}
-                          value={commentInput}
-                          onChange={(e) => setCommentInput(e.target.value)}
-                          placeholder="팀원에게 전달할 피드백 또는 관리자 메모를 남겨주세요."
-                          className="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-indigo-200 bg-white text-black focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all placeholder:text-gray-400"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCancelEditComment}
-                            disabled={isSavingComment}
-                            className="px-2.5 py-1 text-xs rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-                          >
-                            취소
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleSaveComment(report.id, username)
-                            }
-                            disabled={isSavingComment}
-                            className="px-3 py-1 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-                          >
-                            {isSavingComment ? "저장 중..." : "저장"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : currentComment ? (
-                      <div className="flex items-start justify-between gap-3 bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 sm:p-3">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-800">
-                            <span>💬</span>
-                            <span>관리자 코멘트</span>
-                          </div>
-                          <p className="text-xs sm:text-sm text-black whitespace-pre-wrap leading-relaxed">
-                            {currentComment}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleStartEditComment(username, currentComment)
-                          }
-                          className="shrink-0 px-2 py-1 text-[11px] font-medium rounded border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"
-                        >
-                          수정
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditComment(username, "")}
-                          className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-600 hover:underline cursor-pointer"
-                        >
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 4v16m8-8H4"
-                            />
-                          </svg>
-                          <span>관리자 코멘트 남기기</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </article>
+                  username={username}
+                  report={report}
+                  currentComment={currentComment}
+                  isEditingComment={isEditingThis}
+                  commentInput={masterComment.commentInput}
+                  isSavingComment={masterComment.isSavingComment}
+                  onChangeCommentInput={masterComment.setCommentInput}
+                  onStartEditComment={() =>
+                    masterComment.startEditComment(username, currentComment)
+                  }
+                  onCancelEditComment={masterComment.cancelEditComment}
+                  onSaveComment={() =>
+                    masterComment.saveComment(report.id, username)
+                  }
+                />
               );
             })}
 
-            {leaveMembersOnDate.length > 0 && (
-              <div
-                className={`${submittedReports.length > 0 ? "pt-4 border-t border-gray-200" : ""}`}
-              >
-                <p className="mb-3 text-xs font-medium text-gray-500">
-                  출장 · 휴가
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {leaveMembersOnDate.map(({ username, type }) => {
-                    const colors = getLeaveTypeColor(type);
-                    return (
-                      <div
-                        key={username}
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                      >
-                        <span className="font-medium text-gray-900">
-                          {username}
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
-                        >
-                          {type}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* 출장 · 휴가 인원 섹션 */}
+            <LeaveMembersSection
+              leaveMembers={leaveMembersOnDate}
+              hasSubmittedReports={submittedReports.length > 0}
+            />
           </div>
         )}
       </section>
 
-      {/* 보고 수정 리스트 */}
-      {currentModifiedReports.length > 0 && (
-        <section className="w-full rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">
-              보고 수정 리스트
-            </h2>
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-              {currentModifiedReports.length}건
-            </span>
-          </div>
-          <p className="mb-5 text-sm text-gray-600">
-            오늘을 제외한 최근 평일 4일 이내에 수정된 보고입니다.
-          </p>
-          <div className="space-y-3">
-            {currentModifiedReports.map((item) => (
-              <div
-                key={`${item.username}-${item.reportDate}`}
-                className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {item.username}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {formatModifiedReportDate(item.reportDate)} 보고 수정
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModifiedReportModal(item)}
-                    className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 cursor-pointer"
-                  >
-                    수정 내용 보러가기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => confirmModification(item.id)}
-                    className="shrink-0 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 cursor-pointer"
-                  >
-                    확인 완료
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* 4. 보고 수정 리스트 섹션 */}
+      <ModifiedReportsSection
+        modifiedReports={modifiedReportsManager.reports}
+        detailModalItem={modifiedReportsManager.detailModalItem}
+        onOpenDetailModal={modifiedReportsManager.setDetailModalItem}
+        onCloseDetailModal={() =>
+          modifiedReportsManager.setDetailModalItem(null)
+        }
+        onConfirmModification={modifiedReportsManager.confirmModification}
+      />
 
-      {/* 수정 내용 모달 */}
-      {modifiedReportModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setModifiedReportModal(null)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <h3 className="font-semibold text-gray-900">
-                수정 보고 · {modifiedReportModal.username}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setModifiedReportModal(null)}
-                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 cursor-pointer"
-                aria-label="닫기"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
-              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                <p className="text-xs font-medium text-amber-700 mb-1">
-                  보고 날짜
-                </p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {formatModifiedReportDate(modifiedReportModal.reportDate)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-2">
-                  수정 내용
-                </p>
-                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-sm leading-relaxed text-gray-800">
-                  <MarkdownView content={modifiedReportModal.content} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 최근 팀원 보고 AI 요약 모달 */}
+      {/* 5. 모달들 */}
       <MemberSummaryModal
-        isOpen={memberSummaryModalOpen}
-        onClose={() => setMemberSummaryModalOpen(false)}
+        isOpen={aiModals.state.memberSummaryModalOpen}
+        onClose={() => aiModals.actions.setMemberSummaryModalOpen(false)}
       />
 
-      {/* 보고서 AI 질의응답 모달 */}
       <ReportAiChatModal
-        isOpen={aiChatModalOpen}
-        onClose={() => setAiChatModalOpen(false)}
+        isOpen={aiModals.state.aiChatModalOpen}
+        onClose={() => aiModals.actions.setAiChatModalOpen(false)}
       />
 
-      {/* 프로젝트별 보고 취합 모달 */}
       <ProjectSummaryModal
-        isOpen={projectSummaryModalOpen}
-        onClose={() => setProjectSummaryModalOpen(false)}
+        isOpen={aiModals.state.projectSummaryModalOpen}
+        onClose={() => aiModals.actions.setProjectSummaryModalOpen(false)}
         selectedDate={selectedDate}
         reports={submittedReportList}
         data={aiPrefetch.projectSummary.data}
@@ -798,10 +323,9 @@ export default function ReadReportContent({
         onRefresh={aiPrefetch.projectSummary.refresh}
       />
 
-      {/* AI 프로젝트 리스크 레이더 모달 */}
       <ReportRiskRadarModal
-        isOpen={riskRadarModalOpen}
-        onClose={() => setRiskRadarModalOpen(false)}
+        isOpen={aiModals.state.riskRadarModalOpen}
+        onClose={() => aiModals.actions.setRiskRadarModalOpen(false)}
         data={aiPrefetch.riskRadar.data}
         isLoading={aiPrefetch.riskRadar.isLoading}
         error={aiPrefetch.riskRadar.error}
@@ -809,10 +333,9 @@ export default function ReadReportContent({
         onRefresh={aiPrefetch.riskRadar.refresh}
       />
 
-      {/* 팀 업무 비중 및 공수 분석 모달 */}
       <ReportWorkloadModal
-        isOpen={workloadModalOpen}
-        onClose={() => setWorkloadModalOpen(false)}
+        isOpen={aiModals.state.workloadModalOpen}
+        onClose={() => aiModals.actions.setWorkloadModalOpen(false)}
         data={aiPrefetch.workload.data}
         isLoading={aiPrefetch.workload.isLoading}
         error={aiPrefetch.workload.error}
@@ -820,56 +343,11 @@ export default function ReadReportContent({
         onRefresh={aiPrefetch.workload.refresh}
       />
 
-      {/* AI 분석 진행 중 안내 팝업창 */}
-      {pendingNoticeModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
-          onClick={() => setPendingNoticeModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-gray-100 text-center space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 shadow-xs">
-              <svg
-                className="h-7 w-7 animate-spin text-amber-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            </div>
-
-            <div className="space-y-1.5">
-              <h4 className="text-base font-bold text-gray-900">
-                AI 분석 준비 중
-              </h4>
-              <p className="text-sm font-semibold text-gray-700 leading-relaxed">
-                {pendingNoticeMessage}
-              </p>
-              <p className="text-xs text-gray-400 pt-1">
-                사내 AI가 최근 보고서를 분석하고 있습니다.
-                <br />
-                분석이 완료되면 즉시 열람하실 수 있습니다.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPendingNoticeModalOpen(false)}
-              className="w-full rounded-xl bg-gray-900 py-2.5 text-xs font-semibold text-white hover:bg-gray-800 transition-colors shadow-xs cursor-pointer"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
+      <PendingNoticeModal
+        isOpen={aiModals.state.pendingNoticeModalOpen}
+        message={aiModals.state.pendingNoticeMessage}
+        onClose={() => aiModals.actions.setPendingNoticeModalOpen(false)}
+      />
     </div>
   );
 }
