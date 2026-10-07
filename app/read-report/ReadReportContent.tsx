@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { MemberReport } from "@/app/lib/attachments";
 import { type ModifiedReportItem } from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
@@ -17,6 +17,7 @@ import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
 import ReadReportHeader from "@/features/read-report/components/ReadReportHeader";
 import DateSelectStrip from "@/features/read-report/components/DateSelectStrip";
 import SubmittedReportCard from "@/features/read-report/components/SubmittedReportCard";
+import SubmittedReportsBookView from "@/features/read-report/components/SubmittedReportsBookView";
 import LeaveMembersSection from "@/features/read-report/components/LeaveMembersSection";
 import ModifiedReportsSection from "@/features/read-report/components/ModifiedReportsSection";
 import PendingNoticeModal from "@/features/read-report/components/PendingNoticeModal";
@@ -58,6 +59,7 @@ export default function ReadReportContent({
   modifiedReports: initialModifiedReports,
   memberList,
 }: Props) {
+  const [viewMode, setViewMode] = useState<"book" | "expanded">("book");
   const dateKeys = useMemo(() => getRecentDateKeys(10), []);
 
   const activeMembers = useMemo(() => {
@@ -143,12 +145,12 @@ export default function ReadReportContent({
       {/* 2. 날짜 선택 스트립 */}
       <DateSelectStrip selectedDate={selectedDate} dateKeys={dateKeys} />
 
-      {/* 3. 오늘의 보고 리스트 섹션 */}
+      {/* 3. 업무 보고 리스트 섹션 */}
       <section className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">
-              오늘의 보고 리스트
+              업무 보고 리스트
             </h2>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
               제출 {submittedReports.length}명
@@ -168,7 +170,7 @@ export default function ReadReportContent({
                   ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
                   : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300 hover:shadow-xs active:bg-purple-200"
               }`}
-              title="오늘 보고를 프로젝트 및 업무 단위로 분류하여 취합합니다"
+              title="선택한 일자의 보고를 프로젝트 및 업무 단위로 분류하여 취합합니다"
             >
               <svg
                 className="w-3.5 h-3.5 text-purple-600"
@@ -246,11 +248,70 @@ export default function ReadReportContent({
                 </>
               )}
             </button>
+
+            {/* 뷰 모드 토글: 책장 모드 vs 세로 전체 펼치기 */}
+            {submittedReports.length > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setViewMode((prev) => (prev === "book" ? "expanded" : "book"))
+                }
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 border cursor-pointer ${
+                  viewMode === "book"
+                    ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:shadow-xs active:bg-amber-200"
+                    : "bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-400 hover:shadow-xs active:bg-indigo-200"
+                }`}
+                title={
+                  viewMode === "book"
+                    ? "모든 팀원의 보고서를 세로로 한 번에 펼쳐봅니다"
+                    : "보고서를 책장 넘기듯 1개씩 집중해서 봅니다"
+                }
+              >
+                {viewMode === "book" ? (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5 text-amber-700"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                      />
+                    </svg>
+                    <span>전체 펼치기</span>
+                    <span className="rounded-full bg-amber-200/80 px-1.5 py-0.2 text-[10px] font-bold text-amber-900">
+                      {submittedReports.length}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5 text-indigo-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                      />
+                    </svg>
+                    <span>📖 책장으로 모아보기</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
         <p className="mb-5 text-sm text-gray-600">
-          미제출 인원을 제외하고, 오늘 작성된 보고를 한 번에 확인합니다.
+          미제출 인원을 제외하고, 작성된 업무 보고를 한 번에 확인합니다.
         </p>
 
         {submittedReports.length === 0 && leaveMembersOnDate.length === 0 ? (
@@ -259,35 +320,74 @@ export default function ReadReportContent({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* 제출된 개별 팀원 보고서 카드 목록 */}
-            {submittedReports.map(({ username, report }) => {
-              const currentComment = masterComment.getEffectiveComment(
-                username,
-                report.masterComment,
-              );
-              const isEditingThis =
-                masterComment.editingCommentMember === username;
+            {/* 제출된 개별 팀원 보고서: 책장 모드 vs 세로 전체 펼침 모드 */}
+            {viewMode === "book" ? (
+              <SubmittedReportsBookView
+                submittedReports={submittedReports}
+                masterComment={masterComment}
+                onExpandAll={() => setViewMode("expanded")}
+              />
+            ) : (
+              <div className="space-y-4">
+                {/* 전체 펼침 모드 안내 배너 */}
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-indigo-50/70 border border-indigo-100 px-4 py-2.5 text-xs text-indigo-900">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <span>📜</span>
+                    <span>
+                      전체 펼침 모드: 총 {submittedReports.length}명의 보고서를 세로로 확인 중입니다.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("book")}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <span>📖 책장으로 접기</span>
+                  </button>
+                </div>
 
-              return (
-                <SubmittedReportCard
-                  key={username}
-                  username={username}
-                  report={report}
-                  currentComment={currentComment}
-                  isEditingComment={isEditingThis}
-                  commentInput={masterComment.commentInput}
-                  isSavingComment={masterComment.isSavingComment}
-                  onChangeCommentInput={masterComment.setCommentInput}
-                  onStartEditComment={() =>
-                    masterComment.startEditComment(username, currentComment)
-                  }
-                  onCancelEditComment={masterComment.cancelEditComment}
-                  onSaveComment={() =>
-                    masterComment.saveComment(report.id, username)
-                  }
-                />
-              );
-            })}
+                {/* 개별 팀원 보고서 카드 목록 */}
+                {submittedReports.map(({ username, report }) => {
+                  const currentComment = masterComment.getEffectiveComment(
+                    username,
+                    report.masterComment,
+                  );
+                  const isEditingThis =
+                    masterComment.editingCommentMember === username;
+
+                  return (
+                    <SubmittedReportCard
+                      key={username}
+                      username={username}
+                      report={report}
+                      currentComment={currentComment}
+                      isEditingComment={isEditingThis}
+                      commentInput={masterComment.commentInput}
+                      isSavingComment={masterComment.isSavingComment}
+                      onChangeCommentInput={masterComment.setCommentInput}
+                      onStartEditComment={() =>
+                        masterComment.startEditComment(username, currentComment)
+                      }
+                      onCancelEditComment={masterComment.cancelEditComment}
+                      onSaveComment={() =>
+                        masterComment.saveComment(report.id, username)
+                      }
+                    />
+                  );
+                })}
+
+                {/* 하단 책장으로 다시 접기 버튼 */}
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("book")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <span>▲ 다시 책장으로 접어서 보기</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 출장 · 휴가 인원 섹션 */}
             <LeaveMembersSection
