@@ -206,9 +206,7 @@ export default function SubmittedReportsBookView({
                           : "bg-amber-500"
                     }`}
                     title={
-                      isConfirmed
-                        ? "코멘트 확인 완료"
-                        : "관리자 코멘트 있음"
+                      isConfirmed ? "코멘트 확인 완료" : "관리자 코멘트 있음"
                     }
                   />
                 )}
@@ -362,7 +360,7 @@ export default function SubmittedReportsBookView({
               />
             ))}
           </div>
-          <span className="text-[11px] text-gray-400 hidden sm:inline">
+          <span className="text-[13px] text-gray-500 hidden sm:inline font-bold">
             키보드 방향키 [ ← ] [ → ] 로도 넘길 수 있습니다
           </span>
         </div>
