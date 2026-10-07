@@ -5,6 +5,7 @@ type Props = {
   isEditing: boolean;
   commentInput: string;
   isSaving: boolean;
+  isConfirmed?: boolean;
   onChangeInput: (val: string) => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
@@ -16,6 +17,7 @@ export default function MasterCommentEditor({
   isEditing,
   commentInput,
   isSaving,
+  isConfirmed,
   onChangeInput,
   onStartEdit,
   onCancelEdit,
@@ -62,9 +64,22 @@ export default function MasterCommentEditor({
       ) : currentComment ? (
         <div className="flex items-start justify-between gap-3 bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 sm:p-3">
           <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-800">
-              <span>💬</span>
-              <span>관리자 코멘트</span>
+            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-800">
+              <span className="flex items-center gap-1">
+                <span>💬</span>
+                <span>관리자 코멘트</span>
+              </span>
+              {isConfirmed ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 shadow-2xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  팀원 확인 완료
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  팀원 미확인
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-black whitespace-pre-wrap leading-relaxed">
               {currentComment}

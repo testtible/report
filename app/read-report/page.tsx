@@ -12,6 +12,7 @@ import {
   getPastEditableDateRange,
   type ModifiedReportItem,
 } from "@/app/lib/modifiedReports";
+import { getUsersFromDb } from "@/app/lib/users";
 import LoginForm from "./LoginForm";
 import ReadReportContent from "./ReadReportContent";
 
@@ -49,9 +50,11 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
       attachment_name: string | null;
       attachment_size: number | null;
       master_comment: string | null;
+      is_confirm_master_comment: boolean;
+      user_id: bigint | null;
     }[]
   >`
-    SELECT id, username, content, attachment_name, attachment_size, master_comment
+    SELECT id, username, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id
     FROM content
     WHERE created_at >= ${start} AND created_at <= ${end}
     ORDER BY created_at DESC
@@ -66,6 +69,8 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
         attachmentName: r.attachment_name,
         attachmentSize: r.attachment_size,
         masterComment: r.master_comment,
+        isConfirmMasterComment: r.is_confirm_master_comment,
+        userId: r.user_id?.toString() ?? null,
       };
     }
   }
@@ -101,6 +106,11 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
   const modifiedReports: ModifiedReportItem[] =
     buildModifiedReportList(pastReports);
 
+  // DB user 테이블에서 팀원 목록 동적 조회
+  const dbUsers = await getUsersFromDb();
+  const members =
+    dbUsers.length > 0 ? dbUsers.map((u) => u.name) : undefined;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -109,6 +119,7 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
           reportsByMember={reportsByMember}
           scheduledLeaveByMember={scheduledLeaveByMember}
           modifiedReports={modifiedReports}
+          memberList={members}
         />
       </div>
     </div>

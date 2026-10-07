@@ -7,9 +7,16 @@ import MarkdownView from "@/app/components/MarkdownView";
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  memberList?: readonly string[] | string[];
 };
 
-export default function MemberSummaryModal({ isOpen, onClose }: Props) {
+export default function MemberSummaryModal({
+  isOpen,
+  onClose,
+  memberList,
+}: Props) {
+  const members =
+    memberList && memberList.length > 0 ? memberList : MEMBERS;
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -268,7 +275,7 @@ export default function MemberSummaryModal({ isOpen, onClose }: Props) {
 
             {/* 빠른 선택 뱃지 버튼들 */}
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {MEMBERS.map((m) => {
+              {members.map((m) => {
                 const isCurrent = selectedMember === m;
                 return (
                   <button

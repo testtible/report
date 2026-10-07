@@ -15,7 +15,7 @@ export default function ReportWriteForm() {
   const { state, refs, actions } = useReportForm();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8 sm:py-4 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
         {/* 메인 폼 카드 */}
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10 border border-gray-100">
@@ -33,6 +33,7 @@ export default function ReportWriteForm() {
             {/* 팀원 선택 */}
             <ReportMemberSelect
               selectedMember={state.selectedMember}
+              memberList={state.memberList}
               onSelectMember={actions.setSelectedMember}
               onOpenHistoryModal={() => actions.setHistoryModalOpen(true)}
             />
@@ -41,6 +42,9 @@ export default function ReportWriteForm() {
             <MasterCommentNotice
               masterComment={state.masterComment}
               isVisible={!!state.selectedMember && !state.isLoadingContent}
+              isConfirmMasterComment={state.isConfirmMasterComment}
+              isConfirming={state.isConfirmingMasterComment}
+              onConfirmMasterComment={actions.handleConfirmMasterComment}
             />
 
             {/* 임시 저장본(로컬 백업) 복원 안내 배너 */}
@@ -52,7 +56,8 @@ export default function ReportWriteForm() {
                       <span>💾</span> 미저장 임시 저장본이 발견되었습니다
                     </p>
                     <p className="text-xs text-amber-800 leading-relaxed">
-                      이전에 작성 중이던 내용({state.draftBackup.savedAt} 자동 저장됨)이 있습니다. 불러오시겠습니까?
+                      이전에 작성 중이던 내용({state.draftBackup.savedAt} 자동
+                      저장됨)이 있습니다. 불러오시겠습니까?
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

@@ -1,20 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getDefaultEditableDate,
   getEditableDateKeys,
   isValidDateKey,
 } from "@/app/lib/dates";
 import { validateAttachmentFile } from "@/app/lib/attachments";
+import { MEMBERS } from "@/app/lib/members";
 import {
+  confirmMasterCommentApi,
   fetchMemberReport,
+  fetchUsersApi,
   postMemberReport,
 } from "@/features/report/services/reportApiService";
 import { useReportDraft } from "@/features/report/hooks/useReportDraft";
 import { useMarkdownEditor } from "@/features/report/hooks/useMarkdownEditor";
 import { useAiRefine } from "@/features/report/hooks/useAiRefine";
-import type { PreviousReport } from "@/features/report/types/report.types";
+import type {
+  PreviousReport,
+  UserItem,
+} from "@/features/report/types/report.types";
 
 export function useReportForm() {
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [selectedMember, setSelectedMember] = useState("");
   const [selectedDate, setSelectedDate] = useState(getDefaultEditableDate);
   const [reportContent, setReportContent] = useState("");
@@ -38,12 +45,37 @@ export function useReportForm() {
   const [removeAttachment, setRemoveAttachment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 직전 보고서 & 마스터 코멘트
+  // 직전 보고서, 마스터 코멘트 & 확인 상태
+  const [reportId, setReportId] = useState<string | null>(null);
   const [previousReportData, setPreviousReportData] =
     useState<PreviousReport | null>(null);
   const [masterComment, setMasterComment] = useState<string | null>(null);
+  const [isConfirmMasterComment, setIsConfirmMasterComment] = useState(false);
+  const [isConfirmingMasterComment, setIsConfirmingMasterComment] =
+    useState(false);
 
   const editableDates = getEditableDateKeys();
+
+  // 사용자 목록 불러오기 (DB user 테이블 연동)
+  useEffect(() => {
+    let cancelled = false;
+    fetchUsersApi()
+      .then((data) => {
+        if (!cancelled && data && data.length > 0) {
+          setUsers(data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load users:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const memberList = useMemo(() => {
+    return users.length > 0 ? users.map((u) => u.name) : [...MEMBERS];
+  }, [users]);
 
   // 하위 전문 훅들
   const draft = useReportDraft(
@@ -76,8 +108,10 @@ export function useReportForm() {
     if (!selectedMember) {
       setReportContent("");
       setIsExistingReport(false);
+      setReportId(null);
       setPreviousReportData(null);
       setMasterComment(null);
+      setIsConfirmMasterComment(false);
       draft.resetDraftState();
       aiRefine.resetRefineState();
       resetAttachmentState();
@@ -93,11 +127,13 @@ export function useReportForm() {
 
         const serverContent = data.content ?? "";
         setIsExistingReport(!!data.exists);
+        setReportId(data.reportId ?? null);
         resetAttachmentState();
         setExistingAttachmentName(data.attachmentName ?? null);
         setExistingAttachmentSize(data.attachmentSize ?? null);
         setPreviousReportData(data.previousReport ?? null);
         setMasterComment(data.masterComment ?? null);
+        setIsConfirmMasterComment(!!data.isConfirmMasterComment);
 
         // 로컬 임시 저장본 확인
         const localDraft = draft.checkLocalDraft(serverContent);
@@ -125,7 +161,9 @@ export function useReportForm() {
         if (!cancelled) {
           setReportContent("");
           setIsExistingReport(false);
+          setReportId(null);
           setMasterComment(null);
+          setIsConfirmMasterComment(false);
           resetAttachmentState();
         }
       } finally {
@@ -189,6 +227,12 @@ export function useReportForm() {
       if (selectedFile) formData.append("file", selectedFile);
       if (removeAttachment) formData.append("removeAttachment", "true");
 
+      // 사용자 ID 매핑
+      const selectedUser = users.find((u) => u.name === selectedMember);
+      if (selectedUser) {
+        formData.append("userId", selectedUser.id);
+      }
+
       const data = await postMemberReport(formData);
 
       alert(
@@ -197,6 +241,9 @@ export function useReportForm() {
 
       draft.clearDraft();
       setIsExistingReport(true);
+      if (data.id) {
+        setReportId(data.id);
+      }
       if (selectedFile) {
         setExistingAttachmentName(selectedFile.name);
         setExistingAttachmentSize(selectedFile.size);
@@ -216,6 +263,22 @@ export function useReportForm() {
     }
   };
 
+  // 마스터 코멘트 확인 완료 처리
+  const handleConfirmMasterComment = async () => {
+    if (!reportId) return;
+    setIsConfirmingMasterComment(true);
+    try {
+      await confirmMasterCommentApi(reportId);
+      setIsConfirmMasterComment(true);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "코멘트 확인 처리에 실패했습니다.";
+      alert(message);
+    } finally {
+      setIsConfirmingMasterComment(false);
+    }
+  };
+
   // 임시 저장본 복원
   const handleRestoreDraft = () => {
     if (!draft.draftBackup) return;
@@ -229,9 +292,12 @@ export function useReportForm() {
 
   return {
     state: {
+      users,
+      memberList,
       selectedMember,
       selectedDate,
       reportContent,
+      reportId,
       isExistingReport,
       isLoadingContent,
       isSubmitting,
@@ -244,6 +310,8 @@ export function useReportForm() {
       removeAttachment,
       previousReportData,
       masterComment,
+      isConfirmMasterComment,
+      isConfirmingMasterComment,
       editableDates,
       draftBackup: draft.draftBackup,
       lastSavedTime: draft.lastSavedTime,
@@ -266,6 +334,7 @@ export function useReportForm() {
       handleFileChange,
       handleRemoveNewFile,
       handleSubmit,
+      handleConfirmMasterComment,
       handleRestoreDraft,
       handleDiscardDraft,
       insertFormat: editor.insertFormat,

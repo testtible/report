@@ -12,6 +12,14 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
+// 개발 환경에서 schema 갱신 전 생성된 인스턴스가 캐시되어 있는 경우 재생성
+if (
+  globalForPrisma.prisma &&
+  !(globalForPrisma.prisma as unknown as { user?: unknown }).user
+) {
+  globalForPrisma.prisma = undefined;
+}
+
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== "production") {

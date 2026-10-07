@@ -4,13 +4,16 @@ type Props = {
   selectedMember: string;
   onSelectMember: (member: string) => void;
   onOpenHistoryModal: () => void;
+  memberList?: readonly string[] | string[];
 };
 
 export default function ReportMemberSelect({
   selectedMember,
   onSelectMember,
   onOpenHistoryModal,
+  memberList,
 }: Props) {
+  const members = memberList && memberList.length > 0 ? memberList : MEMBERS;
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -66,7 +69,7 @@ export default function ReportMemberSelect({
         <option value="" disabled>
           선택
         </option>
-        {MEMBERS.map((member) => (
+        {members.map((member) => (
           <option key={member} value={member}>
             {member}
           </option>

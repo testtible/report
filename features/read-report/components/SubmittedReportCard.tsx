@@ -53,6 +53,7 @@ export default function SubmittedReportCard({
         isEditing={isEditingComment}
         commentInput={commentInput}
         isSaving={isSavingComment}
+        isConfirmed={report.isConfirmMasterComment}
         onChangeInput={onChangeCommentInput}
         onStartEdit={onStartEditComment}
         onCancelEdit={onCancelEditComment}

@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
     hasAttachment: !!report?.attachment_name,
     previousReport,
     masterComment: report?.master_comment ?? null,
+    isConfirmMasterComment: report?.is_confirm_master_comment ?? false,
+    userId: report?.user_id?.toString() ?? null,
+    reportId: report?.id?.toString() ?? null,
   });
 }
 
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
     const content = (formData.get("content") as string | null)?.trim() ?? "";
     const date = formData.get("date") as string | null;
     const removeAttachment = formData.get("removeAttachment") === "true";
+    const formUserId = formData.get("userId") as string | null;
 
     if (!username) {
       return NextResponse.json(
@@ -97,6 +101,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // user_id 매핑 (클라이언트에서 넘겼거나, 이름으로 DB 조회)
+    let userId: bigint | null = null;
+    if (formUserId) {
+      try {
+        userId = BigInt(formUserId);
+      } catch {
+        userId = null;
+      }
+    }
+    if (!userId) {
+      const foundUser = await prisma.user.findFirst({
+        where: { name: username },
+        select: { id: true },
+      });
+      if (foundUser) userId = foundUser.id;
+    }
+
     const { start, end } = getDateRange(dateKey);
     const existing = await findReportByDate(username, start, end);
 
@@ -106,6 +127,7 @@ export async function POST(request: Request) {
         content,
         parsedAttachment.attachment,
         removeAttachment,
+        userId,
       );
       return NextResponse.json({
         ok: true,
@@ -120,6 +142,7 @@ export async function POST(request: Request) {
       content,
       createdAt,
       parsedAttachment.attachment,
+      userId,
     );
 
     return NextResponse.json({

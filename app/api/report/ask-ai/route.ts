@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { MEMBERS } from "@/app/lib/members";
+import { getUsersFromDb } from "@/app/lib/users";
 import { getAiApiUrl, getAiModel } from "@/app/lib/ai";
 import {
   getMonthsAgoKey,
@@ -80,8 +81,11 @@ export async function POST(request: NextRequest) {
           : null;
 
     // 1. 질문에서 팀원 이름 탐색 (targetMember 미지정 시 사용)
+    const dbUsers = await getUsersFromDb();
+    const memberNames =
+      dbUsers.length > 0 ? dbUsers.map((u) => u.name) : [...MEMBERS];
     const matchedMember = !targetMember
-      ? MEMBERS.find((m) => trimmedQuestion.includes(m))
+      ? memberNames.find((m) => trimmedQuestion.includes(m))
       : null;
 
     // 2. 질문에서 핵심 검색 키워드 추출

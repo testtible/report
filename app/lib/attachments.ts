@@ -14,6 +14,8 @@ export type MemberReport = {
   attachmentName: string | null;
   attachmentSize: number | null;
   masterComment?: string | null;
+  isConfirmMasterComment?: boolean;
+  userId?: string | null;
 };
 
 export function formatFileSize(bytes: number): string {

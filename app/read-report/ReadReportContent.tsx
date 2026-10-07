@@ -49,25 +49,34 @@ type Props = {
   reportsByMember: Record<string, MemberReport>;
   scheduledLeaveByMember: Record<string, string | null>;
   modifiedReports: ModifiedReportItem[];
+  memberList?: string[];
 };
 
 export default function ReadReportContent({
   selectedDate,
   reportsByMember,
   modifiedReports: initialModifiedReports,
+  memberList,
 }: Props) {
   const dateKeys = useMemo(() => getRecentDateKeys(10), []);
+
+  const activeMembers = useMemo(() => {
+    return memberList && memberList.length > 0 ? memberList : [...MEMBERS];
+  }, [memberList]);
 
   // 1. 제출된 보고서 데이터 분류 계산
   const allSubmittedReports = useMemo(
     () =>
-      MEMBERS.map((username) => ({
-        username,
-        report: reportsByMember[username],
-      })).filter(
-        ({ report }) => report !== undefined && report.content.trim().length > 0,
-      ),
-    [reportsByMember],
+      activeMembers
+        .map((username) => ({
+          username,
+          report: reportsByMember[username],
+        }))
+        .filter(
+          ({ report }) =>
+            report !== undefined && report.content.trim().length > 0,
+        ),
+    [activeMembers, reportsByMember],
   );
 
   const leaveMembersOnDate = useMemo(
@@ -304,6 +313,7 @@ export default function ReadReportContent({
       <MemberSummaryModal
         isOpen={aiModals.state.memberSummaryModalOpen}
         onClose={() => aiModals.actions.setMemberSummaryModalOpen(false)}
+        memberList={activeMembers}
       />
 
       <ReportAiChatModal
