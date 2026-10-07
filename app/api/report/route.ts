@@ -66,6 +66,8 @@ export async function GET(request: NextRequest) {
     isConfirmMasterComment: report?.is_confirm_master_comment ?? false,
     userId: report?.user_id?.toString() ?? null,
     reportId: report?.id?.toString() ?? null,
+    userComment: report?.user_comment ?? null,
+    isUserComment: report?.is_user_comment ?? false,
   });
 }
 

@@ -19,6 +19,8 @@ export async function findReportByDate(
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      user_comment: string | null;
+      is_user_comment: boolean;
     }
   | undefined
 > {
@@ -31,9 +33,11 @@ export async function findReportByDate(
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      user_comment: string | null;
+      is_user_comment: boolean;
     }[]
   >`
-    SELECT id, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id
+    SELECT id, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, user_comment, is_user_comment
     FROM content
     WHERE username = ${username}
       AND created_at >= ${start}
@@ -145,6 +149,17 @@ export async function confirmMasterComment(id: bigint): Promise<void> {
   await prisma.$executeRaw`
     UPDATE content
     SET is_confirm_master_comment = true
+    WHERE id = ${id}
+  `;
+}
+
+export async function updateUserComment(
+  id: bigint,
+  userComment: string | null,
+): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE content
+    SET user_comment = ${userComment}, is_user_comment = ${Boolean(userComment?.trim())}
     WHERE id = ${id}
   `;
 }

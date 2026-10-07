@@ -52,9 +52,11 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      user_comment: string | null;
+      is_user_comment: boolean;
     }[]
   >`
-    SELECT id, username, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id
+    SELECT id, username, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, user_comment, is_user_comment
     FROM content
     WHERE created_at >= ${start} AND created_at <= ${end}
     ORDER BY created_at DESC
@@ -71,6 +73,8 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
         masterComment: r.master_comment,
         isConfirmMasterComment: r.is_confirm_master_comment,
         userId: r.user_id?.toString() ?? null,
+        userComment: r.user_comment ?? null,
+        isUserComment: r.is_user_comment ?? false,
       };
     }
   }

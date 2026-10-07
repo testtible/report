@@ -16,6 +16,8 @@ export type MemberReport = {
   masterComment?: string | null;
   isConfirmMasterComment?: boolean;
   userId?: string | null;
+  userComment?: string | null;
+  isUserComment?: boolean;
 };
 
 export function formatFileSize(bytes: number): string {
