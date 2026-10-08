@@ -219,8 +219,8 @@ function parseMarkdownBlocks(raw: string): Block[] {
       continue;
     }
 
-    // 7. 태스크 체크리스트 (- [ ] 또는 - [x])
-    const taskMatch = trimmed.match(/^[-*+]\s*\[([ xX])\]\s*(.*)$/);
+    // 7. 태스크 체크리스트 (완료: - [x], -[x], -[ x], -[x ], - [ x ] / 진행중: - [ ], - [], -[])
+    const taskMatch = trimmed.match(/^[-*+]\s*\[\s*([xX]?)\s*\]\s*(.*)$/);
     if (taskMatch) {
       const checked = taskMatch[1].toLowerCase() === "x";
       const text = taskMatch[2].trim();
@@ -234,7 +234,7 @@ function parseMarkdownBlocks(raw: string): Block[] {
       const items: string[] = [];
       while (i < lines.length) {
         const curTrim = lines[i].trim();
-        if (curTrim.match(/^[-*+]\s*\[[ xX]\]/)) {
+        if (curTrim.match(/^[-*+]\s*\[\s*[xX]?\s*\]/)) {
           break;
         }
         const listMatch = curTrim.match(/^[-*+]\s*(.*)$/);

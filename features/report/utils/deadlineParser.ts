@@ -158,12 +158,12 @@ export function extractTasksFromContent(
     }
 
     // 완료 여부 판별:
-    // 1) 체크박스 체크: - [x], - [X]
+    // 1) 체크박스 체크: - [x], -[x], -[ x], -[x ], - [ x ] 등
     // 2) 취소선: ~~업무 내용~~
     // 3) 완료 키워드: [완료], (완료), 완료:, ✅
     // 4) 섹션 헤더에 '완료' 또는 'Done' 키워드가 있고 '예정'/'To-do'가 없는 경우
     const isCompletedByText =
-      /^[-*+]\s*\[[xX]\]/.test(trimmed) ||
+      /^[-*+]\s*\[\s*[xX]\s*\]/.test(trimmed) ||
       /^~~.*~~$/.test(trimmed) ||
       /\[완료\]|\(완료\)|^\s*완료\s*[:：]|✅/i.test(trimmed);
 
@@ -198,7 +198,7 @@ export function extractTasksFromContent(
 
     // 업무 내용 정제: 앞의 불릿/체크박스/기호 제거
     let taskTitle = trimmed
-      .replace(/^[-*+]\s*(\[[ xX]\]\s*)?/, "") // 불릿 및 체크박스 제거
+      .replace(/^[-*+]\s*(\[\s*[xX]?\s*\]\s*)?/, "") // 불릿 및 체크박스 제거 (- [ ], -[], -[x], -[ x] 등 모두 지원)
       .replace(/^\d+[.)]\s*/, "") // 1. 2) 번호 리스트 제거
       .trim();
 

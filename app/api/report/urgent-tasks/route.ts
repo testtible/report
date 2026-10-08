@@ -143,13 +143,13 @@ async function callOllamaAnalysis(
 
 function normalizeText(s: string): string {
   return s
-    .replace(/-\s*\[[ xX]\]/g, "")
+    .replace(/^[-*+]?\s*\[\s*[xX]?\s*\]/g, "")
     .replace(/[~`'"()[\]{}#*_\-+=:,./\\]/g, "")
     .replace(/\s+/g, "")
     .toLowerCase();
 }
 
-/** 보고서들에서 - [x] 체크되거나 완료 표시된 모든 업무 텍스트를 수집 */
+/** 보고서들에서 완료 표시(- [x], -[x], -[ x], -[x ], - [ x ] 등)된 모든 업무 텍스트를 수집 */
 function extractCompletedNorms(
   reports: { content: string | null }[],
 ): Set<string> {
@@ -159,12 +159,12 @@ function extractCompletedNorms(
     for (const line of r.content.split("\n")) {
       const trimmed = line.trim();
       if (
-        /-\s*\[[xX]\]/.test(trimmed) ||
+        /^[-*+]?\s*\[\s*[xX]\s*\]/.test(trimmed) ||
         /\[완료\]|\(완료\)/.test(trimmed) ||
         /완료(?:됨|완료|함)/.test(trimmed)
       ) {
         const text = trimmed
-          .replace(/-\s*\[[xX]\]/, "")
+          .replace(/^[-*+]?\s*\[\s*[xX]\s*\]/, "")
           .replace(/\[완료\]|\(완료\)/, "")
           .trim();
         const norm = normalizeText(text);
@@ -227,8 +227,11 @@ function cleanReportForAi(
     for (const line of sec.lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      // 완료 체크 표시 제외
-      if (/-\s*\[[xX]\]/.test(trimmed) || /\[완료\]|\(완료\)/.test(trimmed)) {
+      // 완료 체크 표시 제외 (- [x], -[x], -[ x], -[x ], - [ x ] 등)
+      if (
+        /^[-*+]?\s*\[\s*[xX]\s*\]/.test(trimmed) ||
+        /\[완료\]|\(완료\)/.test(trimmed)
+      ) {
         continue;
       }
 
@@ -354,7 +357,7 @@ export async function GET(request: NextRequest) {
 
     // 4. Ollama AI 분석 프롬프트
     const prompt = `당신은 사내 일일 업무 보고서 분석 AI입니다.
-아래 데이터는 최근 일일 보고서에서 이미 완료된 업무(- [x], 완료 표시)를 사전에 모두 제거한 **미완료 업무 목록**입니다.
+아래 데이터는 최근 일일 보고서에서 이미 완료된 업무(- [x], -[x], -[ x], -[x ], - [ x ], 완료 표시 등)를 사전에 모두 제거한 **미완료 업무 목록**입니다.
 이 목록에서 기준 일자('${baseDateKey}') 기준 '마감 임박 업무'와 '최근 지연 업무'를 추출하십시오.
 
 ### 분석 기준 일자: ${baseDateKey} (${weekdays[0]?.dayName || "오늘"})

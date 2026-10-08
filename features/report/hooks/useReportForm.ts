@@ -44,6 +44,7 @@ export function useReportForm() {
     UnreadMasterCommentItem[]
   >([]);
   const [isUnreadModalOpen, setIsUnreadModalOpen] = useState(false);
+  const unreadCommentsRequestIdRef = useRef<number>(0);
 
   // 첨부파일 상태
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -203,27 +204,33 @@ export function useReportForm() {
 
   // 팀원 선택 시 최근 5일(주말 제외) 미확인 관리자 코멘트 확인
   useEffect(() => {
+    const currentReqId = ++unreadCommentsRequestIdRef.current;
+    // 팀원 변경 즉시 이전 팀원의 미확인 코멘트 목록 및 팝업 모달 초기화
+    setUnreadMasterComments([]);
+    setIsUnreadModalOpen(false);
+
     if (!selectedMember) {
-      setUnreadMasterComments([]);
-      setIsUnreadModalOpen(false);
       return;
     }
 
-    let cancelled = false;
     fetchUnreadMasterCommentsApi(selectedMember)
       .then((items) => {
-        if (!cancelled && items && items.length > 0) {
-          setUnreadMasterComments(items);
+        // 도중에 다른 팀원이 선택되었으면 이전 응답 무시
+        if (unreadCommentsRequestIdRef.current !== currentReqId) return;
+        const list = items ?? [];
+        setUnreadMasterComments(list);
+        if (list.length > 0) {
           setIsUnreadModalOpen(true);
+        } else {
+          setIsUnreadModalOpen(false);
         }
       })
       .catch((err) => {
+        if (unreadCommentsRequestIdRef.current !== currentReqId) return;
         console.error("Failed to check unread master comments:", err);
+        setUnreadMasterComments([]);
+        setIsUnreadModalOpen(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [selectedMember]);
 
   // 1분(60초)마다 팀장님의 새로운 피드백 코멘트 도착 여부 refetch 체크
@@ -304,6 +311,11 @@ export function useReportForm() {
     let cancelled = false;
     const load = async () => {
       setIsLoadingContent(true);
+      // 팀원 또는 날짜 변경 시 이전 보고서 코멘트 즉시 초기화
+      setMasterComment(null);
+      setIsConfirmMasterComment(false);
+      setUserComment(null);
+      setIsUserComment(false);
       try {
         const data = await fetchMemberReport(selectedMember, selectedDate);
         if (cancelled) return;
