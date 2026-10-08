@@ -1,4 +1,5 @@
 import type {
+  OrganizationResponse,
   ReportFetchResponse,
   ReportSubmitResponse,
   UnreadMasterCommentItem,
@@ -148,4 +149,15 @@ export async function fetchUrgentTasksApi(
     hasError: false,
   };
 }
+
+export async function fetchOrganizationApi(): Promise<OrganizationResponse> {
+  const res = await fetch("/api/organization");
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || "조직 정보 조회에 실패했습니다.");
+  }
+  return data;
+}
+
+
 

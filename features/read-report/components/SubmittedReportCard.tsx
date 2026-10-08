@@ -6,6 +6,7 @@ import MasterCommentEditor from "@/features/read-report/components/MasterComment
 type Props = {
   username: string;
   report: MemberReport;
+  teamName?: string;
   currentComment: string;
   isEditingComment: boolean;
   commentInput: string;
@@ -20,6 +21,7 @@ type Props = {
 export default function SubmittedReportCard({
   username,
   report,
+  teamName,
   currentComment,
   isEditingComment,
   commentInput,
@@ -32,7 +34,14 @@ export default function SubmittedReportCard({
 }: Props) {
   return (
     <article className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-      <p className="mb-2 text-sm font-semibold text-gray-900">{username}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-sm font-bold text-gray-900">{username}</p>
+        {teamName && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-700">
+            {teamName}
+          </span>
+        )}
+      </div>
       <div className="text-sm leading-relaxed text-gray-800">
         <MarkdownView content={report.content} />
       </div>

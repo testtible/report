@@ -7,6 +7,7 @@ import SubmittedReportCard from "@/features/read-report/components/SubmittedRepo
 type SubmittedReportItem = {
   username: string;
   report: MemberReport;
+  teamName?: string;
 };
 
 type Props = {
@@ -313,6 +314,7 @@ export default function SubmittedReportsBookView({
             <SubmittedReportCard
               username={currentItem.username}
               report={currentItem.report}
+              teamName={currentItem.teamName}
               currentComment={effectiveComment}
               isEditingComment={isEditingThis}
               commentInput={masterComment.commentInput}

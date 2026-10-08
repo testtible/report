@@ -14,9 +14,41 @@ import UserCommentEditor from "@/features/report/components/UserCommentEditor";
 import UnreadMasterCommentModal from "@/features/report/components/UnreadMasterCommentModal";
 import UrgentTaskWidget from "@/features/report/components/UrgentTaskWidget";
 import Snackbar from "@/app/components/Snackbar";
+import MemberSelectionLanding from "@/features/report/components/MemberSelectionLanding";
 
 export default function ReportWriteForm() {
   const { state, refs, actions } = useReportForm();
+
+  // 브라우저 localStorage 복원 전 깜빡임 방지
+  if (!state.isMemberHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent" />
+          <span className="text-xs text-gray-500 font-medium">
+            사용자 환경 설정 불러오는 중...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 작성자가 선택되지 않았거나 팀원 변경 버튼을 눌렀을 때: 제안 4번 방식의 계층형 선택 랜딩 화면 표시
+  if (!state.selectedMember || state.isChangingMember) {
+    return (
+      <MemberSelectionLanding
+        hierarchy={state.orgData?.hierarchy ?? []}
+        users={state.orgData?.users ?? []}
+        unassignedUsers={state.orgData?.unassignedUsers ?? []}
+        isLoading={state.isLoadingOrg}
+        currentMember={state.selectedMember}
+        onSelectMember={actions.setSelectedMember}
+        onCancelChange={
+          state.selectedMember ? actions.handleCancelChangeMember : undefined
+        }
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8 sm:py-4 px-4 sm:px-6 lg:px-8">
@@ -38,8 +70,10 @@ export default function ReportWriteForm() {
             <ReportMemberSelect
               selectedMember={state.selectedMember}
               memberList={state.memberList}
+              selectedMemberOrg={state.selectedMemberOrg}
               onSelectMember={actions.setSelectedMember}
               onOpenHistoryModal={() => actions.setHistoryModalOpen(true)}
+              onChangeMemberClick={actions.handleStartChangeMember}
             />
 
             {/* 최근 5일 미확인 팀장님 피드백 코멘트 다시 열기 배너 */}

@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
     masterComment: report?.master_comment ?? null,
     isConfirmMasterComment: report?.is_confirm_master_comment ?? false,
     userId: report?.user_id?.toString() ?? null,
+    teamId: report?.team_id != null ? Number(report.team_id) : null,
     reportId: report?.id?.toString() ?? null,
     userComment: report?.user_comment ?? null,
     isUserComment: report?.is_user_comment ?? false,
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     const date = formData.get("date") as string | null;
     const removeAttachment = formData.get("removeAttachment") === "true";
     const formUserId = formData.get("userId") as string | null;
+    const formTeamId = formData.get("teamId") as string | null;
 
     if (!username) {
       return NextResponse.json(
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // user_id 매핑 (클라이언트에서 넘겼거나, 이름으로 DB 조회)
+    // user_id 및 team_id 매핑 (클라이언트에서 넘겼거나, 이름으로 DB 조회)
     let userId: bigint | null = null;
     if (formUserId) {
       try {
@@ -112,12 +114,25 @@ export async function POST(request: Request) {
         userId = null;
       }
     }
-    if (!userId) {
+
+    let teamId: bigint | null = null;
+    if (formTeamId) {
+      try {
+        teamId = BigInt(formTeamId);
+      } catch {
+        teamId = null;
+      }
+    }
+
+    if (!userId || !teamId) {
       const foundUser = await prisma.user.findFirst({
-        where: { name: username },
-        select: { id: true },
+        where: userId ? { id: userId } : { name: username },
+        select: { id: true, team_id: true },
       });
-      if (foundUser) userId = foundUser.id;
+      if (foundUser) {
+        if (!userId) userId = foundUser.id;
+        if (!teamId && foundUser.team_id != null) teamId = foundUser.team_id;
+      }
     }
 
     const formUserComment = formData.has("userComment")
@@ -135,6 +150,7 @@ export async function POST(request: Request) {
         removeAttachment,
         userId,
         formUserComment,
+        teamId,
       );
       return NextResponse.json({
         ok: true,
@@ -151,6 +167,7 @@ export async function POST(request: Request) {
       parsedAttachment.attachment,
       userId,
       formUserComment ?? null,
+      teamId,
     );
 
     return NextResponse.json({

@@ -16,6 +16,7 @@ export type MemberReport = {
   masterComment?: string | null;
   isConfirmMasterComment?: boolean;
   userId?: string | null;
+  teamId?: number | null;
   userComment?: string | null;
   isUserComment?: boolean;
 };

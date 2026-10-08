@@ -9,6 +9,7 @@ import { MEMBERS } from "@/app/lib/members";
 import {
   confirmMasterCommentApi,
   fetchMemberReport,
+  fetchOrganizationApi,
   fetchUnreadMasterCommentsApi,
   fetchUrgentTasksApi,
   fetchUsersApi,
@@ -20,14 +21,35 @@ import { useMarkdownEditor } from "@/features/report/hooks/useMarkdownEditor";
 import { useAiRefine } from "@/features/report/hooks/useAiRefine";
 import type { UrgentTaskItem } from "@/features/report/utils/deadlineParser";
 import type {
+  OrganizationResponse,
   PreviousReport,
   UnreadMasterCommentItem,
   UserItem,
+  UserOrgItem,
 } from "@/features/report/types/report.types";
 
 export function useReportForm() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [selectedMember, setSelectedMember] = useState("");
+  const [orgData, setOrgData] = useState<OrganizationResponse | null>(null);
+  const [isLoadingOrg, setIsLoadingOrg] = useState(false);
+  const [isChangingMember, setIsChangingMember] = useState(false);
+  const [isMemberHydrated, setIsMemberHydrated] = useState(false);
+
+  // 브라우저 localStorage에서 이전에 선택된 팀원 자동 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("aerix_selected_member");
+      if (saved) {
+        setSelectedMember(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to read localStorage:", e);
+    } finally {
+      setIsMemberHydrated(true);
+    }
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState(getDefaultEditableDate);
   const [reportContent, setReportContent] = useState("");
   const [isExistingReport, setIsExistingReport] = useState(false);
@@ -155,26 +177,65 @@ export function useReportForm() {
 
   const editableDates = getEditableDateKeys();
 
-  // 사용자 목록 불러오기 (DB user 테이블 연동)
+  // 조직도(부문 > 부서 > 팀 > 사용자) 및 사용자 계층 데이터 로드
   useEffect(() => {
     let cancelled = false;
-    fetchUsersApi()
+    setIsLoadingOrg(true);
+    fetchOrganizationApi()
       .then((data) => {
-        if (!cancelled && data && data.length > 0) {
-          setUsers(data);
+        if (!cancelled && data) {
+          setOrgData(data);
+          if (data.users && data.users.length > 0) {
+            setUsers(data.users);
+          }
         }
       })
       .catch((err) => {
-        console.error("Failed to load users:", err);
+        console.error("Failed to load organization data:", err);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingOrg(false);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const selectedMemberOrg = useMemo(() => {
+    if (!orgData || !selectedMember) return undefined;
+    return orgData.users.find((u) => u.name === selectedMember);
+  }, [orgData, selectedMember]);
+
   const memberList = useMemo(() => {
+    if (orgData?.users && orgData.users.length > 0) {
+      return orgData.users.map((u) => u.name);
+    }
     return users.length > 0 ? users.map((u) => u.name) : [...MEMBERS];
-  }, [users]);
+  }, [orgData, users]);
+
+  const handleSelectMember = useCallback((memberName: string) => {
+    setSelectedMember(memberName);
+    setIsChangingMember(false);
+    try {
+      if (memberName) {
+        localStorage.setItem("aerix_selected_member", memberName);
+      } else {
+        localStorage.removeItem("aerix_selected_member");
+      }
+    } catch (e) {
+      console.warn("Failed to save to localStorage:", e);
+    }
+  }, []);
+
+  const handleStartChangeMember = useCallback(() => {
+    setIsChangingMember(true);
+  }, []);
+
+  const handleCancelChangeMember = useCallback(() => {
+    setIsChangingMember(false);
+  }, []);
 
   // 하위 전문 훅들
   const draft = useReportDraft(
@@ -427,10 +488,13 @@ export function useReportForm() {
       if (removeAttachment) formData.append("removeAttachment", "true");
       if (userComment !== null) formData.append("userComment", userComment.trim());
 
-      // 사용자 ID 매핑
+      // 사용자 ID 및 팀 ID 매핑
       const selectedUser = users.find((u) => u.name === selectedMember);
       if (selectedUser) {
         formData.append("userId", selectedUser.id);
+        if (selectedUser.teamId != null) {
+          formData.append("teamId", String(selectedUser.teamId));
+        }
       }
 
       const data = await postMemberReport(formData);
@@ -580,6 +644,11 @@ export function useReportForm() {
       users,
       memberList,
       selectedMember,
+      orgData,
+      isLoadingOrg,
+      isChangingMember,
+      isMemberHydrated,
+      selectedMemberOrg,
       selectedDate,
       reportContent,
       reportId,
@@ -617,7 +686,9 @@ export function useReportForm() {
       textareaRef: editor.textareaRef,
     },
     actions: {
-      setSelectedMember,
+      setSelectedMember: handleSelectMember,
+      handleStartChangeMember,
+      handleCancelChangeMember,
       setSelectedDate,
       setReportContent,
       setHistoryModalOpen,

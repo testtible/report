@@ -13,7 +13,10 @@ import MemberSummaryModal from "@/app/components/MemberSummaryModal";
 import ReportRiskRadarModal from "@/app/components/ReportRiskRadarModal";
 import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
 import UnreadUserCommentsBookModal from "@/features/read-report/components/UnreadUserCommentsBookModal";
-import type { UnreadUserCommentItem } from "@/features/report/types/report.types";
+import type {
+  OrganizationResponse,
+  UnreadUserCommentItem,
+} from "@/features/report/types/report.types";
 import {
   confirmUserCommentApi,
   fetchUnreadUserCommentsApi,
@@ -22,6 +25,8 @@ import Snackbar, { type SnackbarType } from "@/app/components/Snackbar";
 
 // Sub-components
 import ReadReportHeader from "@/features/read-report/components/ReadReportHeader";
+import TeamSelectionLanding from "@/features/read-report/components/TeamSelectionLanding";
+import TeamCurrentBar from "@/features/read-report/components/TeamCurrentBar";
 import DateSelectStrip from "@/features/read-report/components/DateSelectStrip";
 import SubmittedReportCard from "@/features/read-report/components/SubmittedReportCard";
 import SubmittedReportsBookView from "@/features/read-report/components/SubmittedReportsBookView";
@@ -59,6 +64,8 @@ type Props = {
   modifiedReports: ModifiedReportItem[];
   memberList?: string[];
   initialUnreadUserComments?: UnreadUserCommentItem[];
+  organization?: OrganizationResponse;
+  initialTeamId?: string;
 };
 
 export default function ReadReportContent({
@@ -67,6 +74,8 @@ export default function ReadReportContent({
   modifiedReports: initialModifiedReports,
   memberList,
   initialUnreadUserComments,
+  organization,
+  initialTeamId,
 }: Props) {
   const [viewMode, setViewMode] = useState<"book" | "expanded">("book");
   const [unreadUserComments, setUnreadUserComments] = useState<
@@ -155,25 +164,94 @@ export default function ReadReportContent({
     };
   }, [selectedDate, showSnackbar]);
 
+  // 팀 선택 상태: team.id (예: "2") 또는 null (선택 전)
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(() => {
+    return initialTeamId || null;
+  });
+  const [isChangingTeam, setIsChangingTeam] = useState<boolean>(false);
+  const [isTeamHydrated, setIsTeamHydrated] = useState<boolean>(false);
+
+  // 클라이언트 localStorage에서 이전 선택된 teamId 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("aerix_read_report_team_id");
+      if (!initialTeamId && saved) {
+        setSelectedTeamId(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to read teamId from localStorage:", e);
+    } finally {
+      setIsTeamHydrated(true);
+    }
+  }, [initialTeamId]);
+
+  const handleSelectTeam = useCallback((teamId: string) => {
+    setSelectedTeamId(teamId);
+    setIsChangingTeam(false);
+    try {
+      localStorage.setItem("aerix_read_report_team_id", teamId);
+    } catch (e) {
+      console.warn("Failed to save teamId to localStorage:", e);
+    }
+    // URL searchParam 동기화 (새로고침 없이 URL 갱신)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("teamId", teamId);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
+
+  const handleStartChangeTeam = useCallback(() => {
+    setIsChangingTeam(true);
+  }, []);
+
+  const handleCancelChangeTeam = useCallback(() => {
+    setIsChangingTeam(false);
+  }, []);
+
+  const currentTeam = useMemo(() => {
+    if (!selectedTeamId || !organization?.teams) return null;
+    return (
+      organization.teams.find((t) => String(t.id) === String(selectedTeamId)) ||
+      null
+    );
+  }, [selectedTeamId, organization]);
+
   const dateKeys = useMemo(() => getRecentDateKeys(10), []);
 
+  // 현재 선택된 팀에 따른 활성 멤버 필터링
   const activeMembers = useMemo(() => {
-    return memberList && memberList.length > 0 ? memberList : [...MEMBERS];
-  }, [memberList]);
+    if (!organization || !organization.users || organization.users.length === 0) {
+      return memberList && memberList.length > 0 ? memberList : [...MEMBERS];
+    }
 
-  // 1. 제출된 보고서 데이터 분류 계산
+    if (!selectedTeamId) {
+      return organization.users.map((u) => u.name);
+    }
+
+    const teamUsers = organization.users.filter(
+      (u) => String(u.teamId) === String(selectedTeamId),
+    );
+    return teamUsers.map((u) => u.name);
+  }, [organization, memberList, selectedTeamId]);
+
+  // 1. 제출된 보고서 데이터 분류 계산 (팀명 매핑 포함)
   const allSubmittedReports = useMemo(
     () =>
       activeMembers
-        .map((username) => ({
-          username,
-          report: currentReportsByMember[username],
-        }))
+        .map((username) => {
+          const userOrg = organization?.users.find((u) => u.name === username);
+          return {
+            username,
+            report: currentReportsByMember[username],
+            teamName: userOrg?.teamName,
+          };
+        })
         .filter(
           ({ report }) =>
             report !== undefined && report.content.trim().length > 0,
         ),
-    [activeMembers, currentReportsByMember],
+    [activeMembers, currentReportsByMember, organization],
   );
 
   const leaveMembersOnDate = useMemo(
@@ -250,6 +328,40 @@ export default function ReadReportContent({
     [unreadUserComments],
   );
 
+  // 1. 브라우저 localStorage 복원 전 깜빡임 방지용 로딩
+  if (!isTeamHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent" />
+          <span className="text-xs text-gray-500 font-medium">
+            팀 설정 불러오는 중...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. 팀이 아직 선택되지 않았거나 팀 변경 버튼을 눌렀을 때: TeamSelectionLanding 랜딩 화면 표시!
+  if (
+    (!selectedTeamId || isChangingTeam) &&
+    organization?.teams &&
+    organization.teams.length > 0
+  ) {
+    return (
+      <TeamSelectionLanding
+        teams={organization.teams}
+        users={organization.users}
+        departments={organization.departments}
+        divisions={organization.divisions}
+        reportsByMember={currentReportsByMember}
+        currentTeamId={selectedTeamId || undefined}
+        onSelectTeam={handleSelectTeam}
+        onCancelChange={selectedTeamId ? handleCancelChangeTeam : undefined}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* 1. 상단 액션 바 (AI 리스크/공수/요약/비서 및 팀원 요청 코멘트 확인) */}
@@ -272,16 +384,33 @@ export default function ReadReportContent({
         onOpenUserCommentsModal={() => setIsUserCommentsModalOpen(true)}
       />
 
-      {/* 2. 날짜 선택 스트립 */}
+      {/* 2. 현재 선택된 팀 정보 바 및 팀 변경 버튼 */}
+      {currentTeam && organization && (
+        <TeamCurrentBar
+          team={currentTeam}
+          users={organization.users}
+          departments={organization.departments}
+          divisions={organization.divisions}
+          reportsByMember={currentReportsByMember}
+          onChangeTeamClick={handleStartChangeTeam}
+        />
+      )}
+
+      {/* 3. 날짜 선택 스트립 */}
       <DateSelectStrip selectedDate={selectedDate} dateKeys={dateKeys} />
 
-      {/* 3. 업무 보고 리스트 섹션 */}
+      {/* 4. 업무 보고 리스트 섹션 */}
       <section className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">
               업무 보고 리스트
             </h2>
+            {currentTeam && (
+              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+                🏢 {currentTeam.name}
+              </span>
+            )}
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
               제출 {submittedReports.length}명
             </span>
@@ -490,7 +619,7 @@ export default function ReadReportContent({
                 </div>
 
                 {/* 개별 팀원 보고서 카드 목록 */}
-                {submittedReports.map(({ username, report }) => {
+                {submittedReports.map(({ username, report, teamName }) => {
                   const currentComment = masterComment.getEffectiveComment(
                     username,
                     report.masterComment,
@@ -503,6 +632,7 @@ export default function ReadReportContent({
                       key={username}
                       username={username}
                       report={report}
+                      teamName={teamName}
                       currentComment={currentComment}
                       isEditingComment={isEditingThis}
                       commentInput={masterComment.commentInput}

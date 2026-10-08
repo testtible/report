@@ -17,7 +17,7 @@ import {
   getPastEditableDateRange,
   type ModifiedReportItem,
 } from "@/app/lib/modifiedReports";
-import { getUsersFromDb } from "@/app/lib/users";
+import { getFullOrganization } from "@/app/lib/organization";
 import type { UnreadUserCommentItem } from "@/features/report/types/report.types";
 import LoginForm from "./LoginForm";
 import ReadReportContent from "./ReadReportContent";
@@ -27,7 +27,7 @@ const READ_REPORT_COOKIE = "read_report_auth";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; teamId?: string }>;
 };
 
 export default async function ReadReportPage({ searchParams }: PageProps) {
@@ -58,11 +58,12 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      team_id: bigint | null;
       user_comment: string | null;
       is_user_comment: boolean;
     }[]
   >`
-    SELECT id, username, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, user_comment, is_user_comment
+    SELECT id, username, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, team_id, user_comment, is_user_comment
     FROM content
     WHERE created_at >= ${start} AND created_at <= ${end}
     ORDER BY created_at DESC
@@ -79,6 +80,7 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
         masterComment: r.master_comment,
         isConfirmMasterComment: r.is_confirm_master_comment,
         userId: r.user_id?.toString() ?? null,
+        teamId: r.team_id != null ? Number(r.team_id) : null,
         userComment: r.user_comment ?? null,
         isUserComment: r.is_user_comment ?? false,
       };
@@ -116,10 +118,12 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
   const modifiedReports: ModifiedReportItem[] =
     buildModifiedReportList(pastReports);
 
-  // DB user 테이블에서 팀원 목록 동적 조회
-  const dbUsers = await getUsersFromDb();
+  // DB 조직도(부문 > 부서 > 팀 > 사용자) 동적 조회
+  const organization = await getFullOrganization();
   const members =
-    dbUsers.length > 0 ? dbUsers.map((u) => u.name) : undefined;
+    organization.users.length > 0
+      ? organization.users.map((u) => u.name)
+      : undefined;
 
   // 최근 5일(주말 제외) 미확인 팀원 요청 코멘트 조회
   const editableKeys = getEditableDateKeys();
@@ -169,6 +173,8 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
           scheduledLeaveByMember={scheduledLeaveByMember}
           modifiedReports={modifiedReports}
           memberList={members}
+          organization={organization}
+          initialTeamId={params.teamId}
           initialUnreadUserComments={unreadUserComments}
         />
       </div>

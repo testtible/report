@@ -3,6 +3,7 @@ import { prisma } from "@/app/lib/prisma";
 export type UserItem = {
   id: string;
   name: string;
+  teamId?: number | null;
 };
 
 /**
@@ -12,11 +13,12 @@ export async function getUsersFromDb(): Promise<UserItem[]> {
   try {
     const rows = await prisma.user.findMany({
       orderBy: { id: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, team_id: true },
     });
     return rows.map((r) => ({
       id: r.id.toString(),
       name: r.name,
+      teamId: r.team_id != null ? Number(r.team_id) : null,
     }));
   } catch (e) {
     console.error("Failed to fetch users from DB:", e);

@@ -1,6 +1,67 @@
 export type UserItem = {
   id: string;
   name: string;
+  teamId?: number | null;
+};
+
+export type DivisionItem = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+export type DepartmentItem = {
+  id: string;
+  name: string;
+  divisionId: number | null;
+  createdAt: string;
+};
+
+export type TeamItem = {
+  id: string;
+  name: string;
+  departmentId: number | null;
+  createdAt: string;
+};
+
+export type UserOrgItem = {
+  id: string;
+  name: string;
+  teamId: number | null;
+  teamName?: string;
+  departmentId?: number | null;
+  departmentName?: string;
+  divisionId?: number | null;
+  divisionName?: string;
+};
+
+export type OrgTeamNode = {
+  id: string;
+  name: string;
+  departmentId: number | null;
+  users: { id: string; name: string; teamId: number | null }[];
+};
+
+export type OrgDepartmentNode = {
+  id: string;
+  name: string;
+  divisionId: number | null;
+  teams: OrgTeamNode[];
+};
+
+export type OrgDivisionNode = {
+  id: string;
+  name: string;
+  departments: OrgDepartmentNode[];
+};
+
+export type OrganizationResponse = {
+  divisions: DivisionItem[];
+  departments: DepartmentItem[];
+  teams: TeamItem[];
+  users: UserOrgItem[];
+  hierarchy: OrgDivisionNode[];
+  unassignedUsers: UserOrgItem[];
 };
 
 export type PreviousReport = {
@@ -17,6 +78,7 @@ export type ReportFetchResponse = {
   masterComment?: string | null;
   isConfirmMasterComment?: boolean;
   userId?: string | null;
+  teamId?: number | null;
   reportId?: string | null;
   userComment?: string | null;
   isUserComment?: boolean;

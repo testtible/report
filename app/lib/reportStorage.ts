@@ -19,6 +19,7 @@ export async function findReportByDate(
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      team_id: bigint | null;
       user_comment: string | null;
       is_user_comment: boolean;
     }
@@ -33,11 +34,12 @@ export async function findReportByDate(
       master_comment: string | null;
       is_confirm_master_comment: boolean;
       user_id: bigint | null;
+      team_id: bigint | null;
       user_comment: string | null;
       is_user_comment: boolean;
     }[]
   >`
-    SELECT id, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, user_comment, is_user_comment
+    SELECT id, content, attachment_name, attachment_size, master_comment, is_confirm_master_comment, user_id, team_id, user_comment, is_user_comment
     FROM content
     WHERE username = ${username}
       AND created_at >= ${start}
@@ -55,7 +57,9 @@ export async function createReport(
   attachment: (AttachmentMeta & { data: Buffer }) | null,
   userId: bigint | null = null,
   userComment: string | null = null,
+  teamId: bigint | number | null = null,
 ): Promise<bigint> {
+  const finalTeamId = teamId != null ? BigInt(teamId) : null;
   const rows = await prisma.$queryRaw<{ id: bigint }[]>`
     INSERT INTO content (
       username,
@@ -67,6 +71,7 @@ export async function createReport(
       attachment_size,
       attachment_data,
       user_id,
+      team_id,
       is_confirm_master_comment,
       user_comment,
       is_user_comment
@@ -81,6 +86,11 @@ export async function createReport(
       ${attachment?.size ?? null},
       ${attachment?.data ?? null},
       ${userId},
+      COALESCE(
+        ${finalTeamId},
+        (SELECT team_id FROM "user" WHERE id = ${userId} OR name = ${username} LIMIT 1),
+        2
+      ),
       false,
       ${userComment},
       false
@@ -97,7 +107,9 @@ export async function updateReport(
   removeAttachment: boolean,
   userId: bigint | null = null,
   userComment: string | null | undefined = undefined,
+  teamId: bigint | number | null = null,
 ): Promise<void> {
+  const finalTeamId = teamId != null ? BigInt(teamId) : null;
   const keepExistingAttachment =
     !attachment && !removeAttachment && !!existing.attachment_name;
 
@@ -105,7 +117,13 @@ export async function updateReport(
     if (keepExistingAttachment) {
       await prisma.$executeRaw`
         UPDATE content
-        SET content = ${content}, updated_at = NOW(), user_id = COALESCE(${userId}, user_id),
+        SET content = ${content}, updated_at = NOW(),
+            user_id = COALESCE(${userId}, user_id),
+            team_id = COALESCE(
+              ${finalTeamId},
+              (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+              team_id
+            ),
             user_comment = ${userComment}, is_user_comment = false
         WHERE id = ${existing.id}
       `;
@@ -123,6 +141,11 @@ export async function updateReport(
           attachment_size = ${attachment.size},
           attachment_data = ${attachment.data},
           user_id = COALESCE(${userId}, user_id),
+          team_id = COALESCE(
+            ${finalTeamId},
+            (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+            team_id
+          ),
           user_comment = ${userComment},
           is_user_comment = false
         WHERE id = ${existing.id}
@@ -140,6 +163,11 @@ export async function updateReport(
         attachment_size = NULL,
         attachment_data = NULL,
         user_id = COALESCE(${userId}, user_id),
+        team_id = COALESCE(
+          ${finalTeamId},
+          (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+          team_id
+        ),
         user_comment = ${userComment},
         is_user_comment = false
       WHERE id = ${existing.id}
@@ -150,7 +178,13 @@ export async function updateReport(
   if (keepExistingAttachment) {
     await prisma.$executeRaw`
       UPDATE content
-      SET content = ${content}, updated_at = NOW(), user_id = COALESCE(${userId}, user_id)
+      SET content = ${content}, updated_at = NOW(),
+          user_id = COALESCE(${userId}, user_id),
+          team_id = COALESCE(
+            ${finalTeamId},
+            (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+            team_id
+          )
       WHERE id = ${existing.id}
     `;
     return;
@@ -166,7 +200,12 @@ export async function updateReport(
         attachment_mime_type = ${attachment.mimeType},
         attachment_size = ${attachment.size},
         attachment_data = ${attachment.data},
-        user_id = COALESCE(${userId}, user_id)
+        user_id = COALESCE(${userId}, user_id),
+        team_id = COALESCE(
+          ${finalTeamId},
+          (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+          team_id
+        )
       WHERE id = ${existing.id}
     `;
     return;
@@ -181,7 +220,12 @@ export async function updateReport(
       attachment_mime_type = NULL,
       attachment_size = NULL,
       attachment_data = NULL,
-      user_id = COALESCE(${userId}, user_id)
+      user_id = COALESCE(${userId}, user_id),
+      team_id = COALESCE(
+        ${finalTeamId},
+        (SELECT team_id FROM "user" WHERE id = COALESCE(${userId}, user_id) OR name = content.username LIMIT 1),
+        team_id
+      )
     WHERE id = ${existing.id}
   `;
 }

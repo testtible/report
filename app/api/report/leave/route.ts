@@ -120,6 +120,11 @@ export async function POST(request: Request) {
     let created = 0;
     let updated = 0;
 
+    const userRec = await prisma.user.findFirst({
+      where: { name: username.trim() },
+      select: { id: true, team_id: true },
+    });
+
     for (const dateKey of dateKeys) {
       const { start, end } = getDateRange(dateKey);
       const existing = await prisma.content.findFirst({
@@ -143,6 +148,8 @@ export async function POST(request: Request) {
             username: username.trim(),
             content: type,
             created_at: createdAt,
+            user_id: userRec?.id ?? null,
+            team_id: userRec?.team_id ?? BigInt(2),
           },
         });
         await prisma.$executeRaw`
