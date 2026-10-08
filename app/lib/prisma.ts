@@ -8,7 +8,7 @@ if (!connectionString) throw new Error("DATABASE_URL is not set");
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 
-const SCHEMA_VERSION = "20261007_v2";
+const SCHEMA_VERSION = "20261008_v1";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
