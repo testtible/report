@@ -120,6 +120,10 @@ export async function POST(request: Request) {
       if (foundUser) userId = foundUser.id;
     }
 
+    const formUserComment = formData.has("userComment")
+      ? (formData.get("userComment") as string | null)
+      : undefined;
+
     const { start, end } = getDateRange(dateKey);
     const existing = await findReportByDate(username, start, end);
 
@@ -130,6 +134,7 @@ export async function POST(request: Request) {
         parsedAttachment.attachment,
         removeAttachment,
         userId,
+        formUserComment,
       );
       return NextResponse.json({
         ok: true,
@@ -145,6 +150,7 @@ export async function POST(request: Request) {
       createdAt,
       parsedAttachment.attachment,
       userId,
+      formUserComment ?? null,
     );
 
     return NextResponse.json({

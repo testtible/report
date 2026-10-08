@@ -10,6 +10,10 @@ import ReportMemberSelect from "@/features/report/components/ReportMemberSelect"
 import MasterCommentNotice from "@/features/report/components/MasterCommentNotice";
 import ReportEditorToolbar from "@/features/report/components/ReportEditorToolbar";
 import ReportAttachmentUploader from "@/features/report/components/ReportAttachmentUploader";
+import UserCommentEditor from "@/features/report/components/UserCommentEditor";
+import UnreadMasterCommentModal from "@/features/report/components/UnreadMasterCommentModal";
+import UrgentTaskWidget from "@/features/report/components/UrgentTaskWidget";
+import Snackbar from "@/app/components/Snackbar";
 
 export default function ReportWriteForm() {
   const { state, refs, actions } = useReportForm();
@@ -38,6 +42,35 @@ export default function ReportWriteForm() {
               onOpenHistoryModal={() => actions.setHistoryModalOpen(true)}
             />
 
+            {/* 최근 5일 미확인 팀장님 피드백 코멘트 다시 열기 배너 */}
+            {state.selectedMember &&
+              state.unreadMasterComments.length > 0 &&
+              !state.isLoadingContent && (
+                <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50/95 via-purple-50/70 to-blue-50/90 p-3 sm:p-3.5 shadow-2xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white text-xs sm:text-sm shadow-2xs">
+                      📢
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-indigo-950 truncate">
+                        팀장님의 미확인 피드백 코멘트가 {state.unreadMasterComments.length}건 있습니다
+                      </p>
+                      <p className="text-[11px] text-indigo-700 hidden sm:block">
+                        피드백 내용을 모아보고 필요한 경우 요청 코멘트를 바로 남길 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => actions.setIsUnreadModalOpen(true)}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                  >
+                    <span>내용 확인하기</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              )}
+
             {/* 관리자 피드백 / 코멘트 배너 */}
             <MasterCommentNotice
               masterComment={state.masterComment}
@@ -46,6 +79,23 @@ export default function ReportWriteForm() {
               isConfirming={state.isConfirmingMasterComment}
               onConfirmMasterComment={actions.handleConfirmMasterComment}
             />
+
+            {/* 마감 임박 업무 위젯 (D-3 이내 및 지연 업무) */}
+            {state.selectedMember && !state.isLoadingContent && (
+              <UrgentTaskWidget
+                tasks={state.urgentTasks}
+                isLoading={state.isLoadingUrgentTasks}
+                selectedMember={state.selectedMember}
+                errorMessage={state.urgentTasksError}
+                onRetry={() =>
+                  actions.loadUrgentTasks(
+                    state.selectedMember,
+                    state.selectedDate,
+                  )
+                }
+                onInsertToContent={actions.handleInsertUrgentTask}
+              />
+            )}
 
             {/* 임시 저장본(로컬 백업) 복원 안내 배너 */}
             {state.draftBackup && (
@@ -141,8 +191,18 @@ export default function ReportWriteForm() {
               disabled={!state.selectedMember || state.isLoadingContent}
             />
 
+            {/* 팀장님께 요청 코멘트 작성 섹션 */}
+            {state.selectedMember && !state.isLoadingContent && (
+              <UserCommentEditor
+                userComment={state.userComment}
+                isUserComment={state.isUserComment}
+                disabled={state.isSubmitting}
+                onSaveUserComment={actions.handleSaveUserComment}
+              />
+            )}
+
             {/* 제출 버튼 */}
-            <div className="pt-2">
+            <div>
               <button
                 type="submit"
                 disabled={
@@ -177,6 +237,25 @@ export default function ReportWriteForm() {
           isOpen={state.aiChatModalOpen}
           onClose={() => actions.setAiChatModalOpen(false)}
           targetMember={state.selectedMember || null}
+        />
+
+        {/* 최근 5일 미확인 관리자 코멘트 팝업 모달 */}
+        <UnreadMasterCommentModal
+          isOpen={state.isUnreadModalOpen}
+          comments={state.unreadMasterComments}
+          onConfirm={actions.handleConfirmUnreadMasterComment}
+          onReplyUserComment={actions.handleReplyUserComment}
+          onClose={() => actions.setIsUnreadModalOpen(false)}
+        />
+
+        {/* 안내 스낵바 알림 */}
+        <Snackbar
+          isOpen={state.snackbar.isOpen}
+          message={state.snackbar.message}
+          type={state.snackbar.type}
+          actionLabel={state.snackbar.actionLabel}
+          onAction={state.snackbar.onAction}
+          onClose={actions.closeSnackbar}
         />
       </div>
     </div>

@@ -18,6 +18,8 @@ export type ReportFetchResponse = {
   isConfirmMasterComment?: boolean;
   userId?: string | null;
   reportId?: string | null;
+  userComment?: string | null;
+  isUserComment?: boolean;
   error?: string;
 };
 
@@ -26,4 +28,25 @@ export type ReportSubmitResponse = {
   id?: string;
   updated?: boolean;
   error?: string;
+};
+
+export type UnreadMasterCommentItem = {
+  id: string;
+  username: string;
+  date: string;
+  masterComment: string;
+  isConfirmMasterComment: boolean;
+  userComment?: string | null;
+  isUserComment?: boolean;
+};
+
+export type UnreadUserCommentItem = {
+  id: string;
+  username: string;
+  date: string;
+  reportContent: string;
+  userComment: string;
+  masterComment: string | null;
+  isConfirmMasterComment: boolean;
+  isUserComment: boolean;
 };

@@ -36,6 +36,18 @@ export function useMasterComment() {
     }
   };
 
+  const saveCommentDirect = async (
+    reportId: string,
+    username: string,
+    text: string,
+  ) => {
+    await saveMasterCommentApi(reportId, text);
+    setCommentOverrides((prev) => ({
+      ...prev,
+      [username]: text.trim(),
+    }));
+  };
+
   const getEffectiveComment = (
     username: string,
     initialComment: string | null | undefined,
@@ -54,6 +66,7 @@ export function useMasterComment() {
     startEditComment,
     cancelEditComment,
     saveComment,
+    saveCommentDirect,
     getEffectiveComment,
   };
 }

@@ -54,6 +54,7 @@ export async function createReport(
   createdAt: Date,
   attachment: (AttachmentMeta & { data: Buffer }) | null,
   userId: bigint | null = null,
+  userComment: string | null = null,
 ): Promise<bigint> {
   const rows = await prisma.$queryRaw<{ id: bigint }[]>`
     INSERT INTO content (
@@ -66,7 +67,9 @@ export async function createReport(
       attachment_size,
       attachment_data,
       user_id,
-      is_confirm_master_comment
+      is_confirm_master_comment,
+      user_comment,
+      is_user_comment
     )
     VALUES (
       ${username},
@@ -78,6 +81,8 @@ export async function createReport(
       ${attachment?.size ?? null},
       ${attachment?.data ?? null},
       ${userId},
+      false,
+      ${userComment},
       false
     )
     RETURNING id
@@ -91,9 +96,56 @@ export async function updateReport(
   attachment: (AttachmentMeta & { data: Buffer }) | null,
   removeAttachment: boolean,
   userId: bigint | null = null,
+  userComment: string | null | undefined = undefined,
 ): Promise<void> {
   const keepExistingAttachment =
     !attachment && !removeAttachment && !!existing.attachment_name;
+
+  if (userComment !== undefined) {
+    if (keepExistingAttachment) {
+      await prisma.$executeRaw`
+        UPDATE content
+        SET content = ${content}, updated_at = NOW(), user_id = COALESCE(${userId}, user_id),
+            user_comment = ${userComment}, is_user_comment = false
+        WHERE id = ${existing.id}
+      `;
+      return;
+    }
+
+    if (attachment) {
+      await prisma.$executeRaw`
+        UPDATE content
+        SET
+          content = ${content},
+          updated_at = NOW(),
+          attachment_name = ${attachment.name},
+          attachment_mime_type = ${attachment.mimeType},
+          attachment_size = ${attachment.size},
+          attachment_data = ${attachment.data},
+          user_id = COALESCE(${userId}, user_id),
+          user_comment = ${userComment},
+          is_user_comment = false
+        WHERE id = ${existing.id}
+      `;
+      return;
+    }
+
+    await prisma.$executeRaw`
+      UPDATE content
+      SET
+        content = ${content},
+        updated_at = NOW(),
+        attachment_name = NULL,
+        attachment_mime_type = NULL,
+        attachment_size = NULL,
+        attachment_data = NULL,
+        user_id = COALESCE(${userId}, user_id),
+        user_comment = ${userComment},
+        is_user_comment = false
+      WHERE id = ${existing.id}
+    `;
+    return;
+  }
 
   if (keepExistingAttachment) {
     await prisma.$executeRaw`
@@ -140,7 +192,9 @@ export async function updateMasterComment(
 ): Promise<void> {
   await prisma.$executeRaw`
     UPDATE content
-    SET master_comment = ${masterComment}, is_confirm_master_comment = false
+    SET master_comment = ${masterComment},
+        is_confirm_master_comment = false,
+        is_user_comment = true
     WHERE id = ${id}
   `;
 }
@@ -159,7 +213,17 @@ export async function updateUserComment(
 ): Promise<void> {
   await prisma.$executeRaw`
     UPDATE content
-    SET user_comment = ${userComment}, is_user_comment = ${Boolean(userComment?.trim())}
+    SET user_comment = ${userComment},
+        is_user_comment = false,
+        is_confirm_master_comment = true
+    WHERE id = ${id}
+  `;
+}
+
+export async function confirmUserComment(id: bigint): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE content
+    SET is_user_comment = true
     WHERE id = ${id}
   `;
 }

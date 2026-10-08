@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MemberReport } from "@/app/lib/attachments";
 import { type ModifiedReportItem } from "@/app/lib/modifiedReports";
 import { isLeaveContent, MEMBERS } from "@/app/lib/members";
@@ -12,6 +12,13 @@ import ProjectSummaryModal from "@/app/components/ProjectSummaryModal";
 import MemberSummaryModal from "@/app/components/MemberSummaryModal";
 import ReportRiskRadarModal from "@/app/components/ReportRiskRadarModal";
 import ReportWorkloadModal from "@/app/components/ReportWorkloadModal";
+import UnreadUserCommentsBookModal from "@/features/read-report/components/UnreadUserCommentsBookModal";
+import type { UnreadUserCommentItem } from "@/features/report/types/report.types";
+import {
+  confirmUserCommentApi,
+  fetchUnreadUserCommentsApi,
+} from "@/features/report/services/reportApiService";
+import Snackbar, { type SnackbarType } from "@/app/components/Snackbar";
 
 // Sub-components
 import ReadReportHeader from "@/features/read-report/components/ReadReportHeader";
@@ -51,6 +58,7 @@ type Props = {
   scheduledLeaveByMember: Record<string, string | null>;
   modifiedReports: ModifiedReportItem[];
   memberList?: string[];
+  initialUnreadUserComments?: UnreadUserCommentItem[];
 };
 
 export default function ReadReportContent({
@@ -58,8 +66,95 @@ export default function ReadReportContent({
   reportsByMember,
   modifiedReports: initialModifiedReports,
   memberList,
+  initialUnreadUserComments,
 }: Props) {
   const [viewMode, setViewMode] = useState<"book" | "expanded">("book");
+  const [unreadUserComments, setUnreadUserComments] = useState<
+    UnreadUserCommentItem[]
+  >(initialUnreadUserComments ?? []);
+  const [isUserCommentsModalOpen, setIsUserCommentsModalOpen] = useState(
+    (initialUnreadUserComments ?? []).length > 0,
+  );
+  const [snackbar, setSnackbar] = useState<{
+    isOpen: boolean;
+    message: string;
+    type?: SnackbarType;
+    actionLabel?: string;
+    onAction?: () => void;
+  }>({
+    isOpen: false,
+    message: "",
+    type: "success",
+  });
+
+  const showSnackbar = useCallback(
+    (
+      message: string,
+      type: SnackbarType = "success",
+      actionLabel?: string,
+      onAction?: () => void,
+    ) => {
+      setSnackbar({ isOpen: true, message, type, actionLabel, onAction });
+    },
+    [],
+  );
+
+  const closeSnackbar = useCallback(() => {
+    setSnackbar((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const [currentReportsByMember, setCurrentReportsByMember] = useState<
+    Record<string, MemberReport>
+  >(reportsByMember);
+
+  // 상위 props 변경 시 동기화
+  useEffect(() => {
+    setCurrentReportsByMember(reportsByMember);
+  }, [reportsByMember]);
+
+  // 1분(60초)마다 팀원 요청 코멘트, 보고서 목록 refetch
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      try {
+        // 1. 최근 5일 미확인 팀원 요청 코멘트 refetch
+        const latestComments = await fetchUnreadUserCommentsApi();
+        setUnreadUserComments((prev) => {
+          const prevIds = new Set(prev.map((c) => c.id));
+          const newArrivals = latestComments.filter((c) => !prevIds.has(c.id));
+
+          if (newArrivals.length > 0) {
+            showSnackbar(
+              `📬 팀원의 새로운 요청 코멘트가 도착했습니다! (신규 ${newArrivals.length}건)`,
+              "info",
+              "확인하기 →",
+              () => setIsUserCommentsModalOpen(true),
+            );
+          }
+          return latestComments;
+        });
+
+        // 2. 현재 선택된 날짜의 팀원 보고서 및 코멘트 상태 refetch
+        if (selectedDate) {
+          const res = await fetch(
+            `/api/report/by-date?date=${encodeURIComponent(selectedDate)}`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.reportsByMember) {
+              setCurrentReportsByMember(data.reportsByMember);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("1분 주기 팀원 요청 코멘트 및 데이터 refetch 오류:", err);
+      }
+    }, 60 * 1000); // 1분 (60,000ms)
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [selectedDate, showSnackbar]);
+
   const dateKeys = useMemo(() => getRecentDateKeys(10), []);
 
   const activeMembers = useMemo(() => {
@@ -72,13 +167,13 @@ export default function ReadReportContent({
       activeMembers
         .map((username) => ({
           username,
-          report: reportsByMember[username],
+          report: currentReportsByMember[username],
         }))
         .filter(
           ({ report }) =>
             report !== undefined && report.content.trim().length > 0,
         ),
-    [activeMembers, reportsByMember],
+    [activeMembers, currentReportsByMember],
   );
 
   const leaveMembersOnDate = useMemo(
@@ -122,9 +217,42 @@ export default function ReadReportContent({
   const copyReports = useCopyReports(submittedReportList);
   const modifiedReportsManager = useModifiedReports(initialModifiedReports);
 
+  const handleConfirmUserComment = async (reportId: string) => {
+    await confirmUserCommentApi(reportId);
+    setUnreadUserComments((prev) =>
+      prev.map((item) =>
+        item.id === reportId ? { ...item, isUserComment: true } : item,
+      ),
+    );
+  };
+
+  const handleSaveCardComment = async (
+    reportId: string,
+    username: string,
+    hasUnconfirmedUserComment: boolean,
+  ) => {
+    await masterComment.saveComment(reportId, username);
+    if (hasUnconfirmedUserComment) {
+      try {
+        await handleConfirmUserComment(reportId);
+      } catch (e) {
+        console.error("Auto confirm user comment error:", e);
+      }
+    }
+    showSnackbar(
+      `'${username}' 님의 보고서에 피드백 코멘트가 저장되었습니다.`,
+      "success",
+    );
+  };
+
+  const pendingUserCommentCount = useMemo(
+    () => unreadUserComments.filter((c) => !c.isUserComment).length,
+    [unreadUserComments],
+  );
+
   return (
     <div className="space-y-6">
-      {/* 1. 상단 액션 바 (AI 리스크/공수/요약/비서) */}
+      {/* 1. 상단 액션 바 (AI 리스크/공수/요약/비서 및 팀원 요청 코멘트 확인) */}
       <ReadReportHeader
         riskRadar={{
           isLoading: aiPrefetch.riskRadar.isLoading,
@@ -134,12 +262,14 @@ export default function ReadReportContent({
           isLoading: aiPrefetch.workload.isLoading,
           data: aiPrefetch.workload.data,
         }}
+        pendingUserCommentCount={pendingUserCommentCount}
         onOpenRiskRadar={aiModals.actions.openRiskRadar}
         onOpenWorkload={aiModals.actions.openWorkload}
         onOpenMemberSummary={() =>
           aiModals.actions.setMemberSummaryModalOpen(true)
         }
         onOpenAiChat={() => aiModals.actions.setAiChatModalOpen(true)}
+        onOpenUserCommentsModal={() => setIsUserCommentsModalOpen(true)}
       />
 
       {/* 2. 날짜 선택 스트립 */}
@@ -155,6 +285,17 @@ export default function ReadReportContent({
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
               제출 {submittedReports.length}명
             </span>
+            {pendingUserCommentCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsUserCommentsModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-300 px-2.5 py-0.5 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all shadow-2xs cursor-pointer animate-pulse"
+                title="최근 5일간 팀원들의 미확인 요청 코멘트를 모달로 확인합니다"
+              >
+                <span>📬</span>
+                <span>팀원 요청 {pendingUserCommentCount}건</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -326,6 +467,8 @@ export default function ReadReportContent({
                 submittedReports={submittedReports}
                 masterComment={masterComment}
                 onExpandAll={() => setViewMode("expanded")}
+                onConfirmUserComment={handleConfirmUserComment}
+                onSaveComment={handleSaveCardComment}
               />
             ) : (
               <div className="space-y-4">
@@ -370,8 +513,13 @@ export default function ReadReportContent({
                       }
                       onCancelEditComment={masterComment.cancelEditComment}
                       onSaveComment={() =>
-                        masterComment.saveComment(report.id, username)
+                        handleSaveCardComment(
+                          report.id,
+                          username,
+                          !!report.userComment && !report.isUserComment,
+                        )
                       }
+                      onConfirmUserComment={handleConfirmUserComment}
                     />
                   );
                 })}
@@ -457,6 +605,28 @@ export default function ReadReportContent({
         isOpen={aiModals.state.pendingNoticeModalOpen}
         message={aiModals.state.pendingNoticeMessage}
         onClose={() => aiModals.actions.setPendingNoticeModalOpen(false)}
+      />
+
+      {/* 최근 5일 미확인 팀원 요청 코멘트 책장 넘김 팝업 모달 */}
+      <UnreadUserCommentsBookModal
+        isOpen={isUserCommentsModalOpen}
+        comments={unreadUserComments}
+        onConfirmUserComment={handleConfirmUserComment}
+        onSaveMasterComment={async (reportId, username, text) => {
+          await masterComment.saveCommentDirect(reportId, username, text);
+        }}
+        onNotifySnackbar={showSnackbar}
+        onClose={() => setIsUserCommentsModalOpen(false)}
+      />
+
+      {/* 안내 스낵바 알림 */}
+      <Snackbar
+        isOpen={snackbar.isOpen}
+        message={snackbar.message}
+        type={snackbar.type}
+        actionLabel={snackbar.actionLabel}
+        onAction={snackbar.onAction}
+        onClose={closeSnackbar}
       />
     </div>
   );

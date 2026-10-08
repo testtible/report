@@ -25,6 +25,12 @@ type Props = {
     saveComment: (reportId: string, username: string) => Promise<void>;
   };
   onExpandAll: () => void;
+  onConfirmUserComment?: (reportId: string) => Promise<void>;
+  onSaveComment?: (
+    reportId: string,
+    username: string,
+    hasUnconfirmedUserComment: boolean,
+  ) => Promise<void>;
 };
 
 type FlipPhase = "idle" | "turning-out" | "turning-in";
@@ -34,6 +40,8 @@ export default function SubmittedReportsBookView({
   submittedReports,
   masterComment,
   onExpandAll,
+  onConfirmUserComment,
+  onSaveComment,
 }: Props) {
   const [currentPage, setCurrentPage] = useState(0);
   const [displayPage, setDisplayPage] = useState(0);
@@ -195,7 +203,7 @@ export default function SubmittedReportsBookView({
                   </span>
                 )}
 
-                {/* 코멘트 배지 */}
+                {/* 관리자 코멘트 배지 */}
                 {hasMasterComment && (
                   <span
                     className={`inline-block h-1.5 w-1.5 rounded-full ${
@@ -207,6 +215,24 @@ export default function SubmittedReportsBookView({
                     }`}
                     title={
                       isConfirmed ? "코멘트 확인 완료" : "관리자 코멘트 있음"
+                    }
+                  />
+                )}
+
+                {/* 팀원 요청 코멘트 배지 */}
+                {item.report.userComment && (
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${
+                      item.report.isUserComment
+                        ? "bg-blue-300"
+                        : isActive
+                          ? "bg-blue-200 animate-pulse"
+                          : "bg-blue-500 animate-pulse"
+                    }`}
+                    title={
+                      item.report.isUserComment
+                        ? "팀원 요청 확인 완료"
+                        : "팀원 요청 확인 대기"
                     }
                   />
                 )}
@@ -299,12 +325,21 @@ export default function SubmittedReportsBookView({
                 )
               }
               onCancelEditComment={masterComment.cancelEditComment}
-              onSaveComment={() =>
-                masterComment.saveComment(
+              onSaveComment={() => {
+                if (onSaveComment) {
+                  return onSaveComment(
+                    currentItem.report.id,
+                    currentItem.username,
+                    !!currentItem.report.userComment &&
+                      !currentItem.report.isUserComment,
+                  );
+                }
+                return masterComment.saveComment(
                   currentItem.report.id,
                   currentItem.username,
-                )
-              }
+                );
+              }}
+              onConfirmUserComment={onConfirmUserComment}
             />
           </div>
         </div>

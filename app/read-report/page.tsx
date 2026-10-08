@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/prisma";
 import { hashReadReportAuth } from "@/app/lib/auth";
-import { getDateRange, getTodayKey, isValidDateKey } from "@/app/lib/dates";
+import {
+  getDateRange,
+  getEditableDateKeys,
+  getTodayKey,
+  isValidDateKey,
+} from "@/app/lib/dates";
 import {
   buildUpcomingLeaveByMember,
   getLeaveSelectableBounds,
@@ -13,6 +18,7 @@ import {
   type ModifiedReportItem,
 } from "@/app/lib/modifiedReports";
 import { getUsersFromDb } from "@/app/lib/users";
+import type { UnreadUserCommentItem } from "@/features/report/types/report.types";
 import LoginForm from "./LoginForm";
 import ReadReportContent from "./ReadReportContent";
 
@@ -115,6 +121,45 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
   const members =
     dbUsers.length > 0 ? dbUsers.map((u) => u.name) : undefined;
 
+  // 최근 5일(주말 제외) 미확인 팀원 요청 코멘트 조회
+  const editableKeys = getEditableDateKeys();
+  const oldestKey = editableKeys[editableKeys.length - 1];
+  const newestKey = editableKeys[0];
+  const { start: fiveDaysStart } = getDateRange(oldestKey);
+  const { end: fiveDaysEnd } = getDateRange(newestKey);
+
+  const rawUnreadUserComments = await prisma.content.findMany({
+    where: {
+      created_at: { gte: fiveDaysStart, lte: fiveDaysEnd },
+      user_comment: { not: null },
+      is_user_comment: false,
+    },
+    orderBy: { created_at: "desc" },
+    select: {
+      id: true,
+      username: true,
+      created_at: true,
+      content: true,
+      user_comment: true,
+      master_comment: true,
+      is_confirm_master_comment: true,
+      is_user_comment: true,
+    },
+  });
+
+  const unreadUserComments: UnreadUserCommentItem[] = rawUnreadUserComments
+    .filter((r) => r.user_comment && r.user_comment.trim() !== "")
+    .map((r) => ({
+      id: r.id.toString(),
+      username: r.username,
+      date: r.created_at.toISOString().slice(0, 10),
+      reportContent: r.content ?? "",
+      userComment: r.user_comment as string,
+      masterComment: r.master_comment ?? null,
+      isConfirmMasterComment: r.is_confirm_master_comment,
+      isUserComment: r.is_user_comment,
+    }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -124,6 +169,7 @@ export default async function ReadReportPage({ searchParams }: PageProps) {
           scheduledLeaveByMember={scheduledLeaveByMember}
           modifiedReports={modifiedReports}
           memberList={members}
+          initialUnreadUserComments={unreadUserComments}
         />
       </div>
     </div>
