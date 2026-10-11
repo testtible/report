@@ -7,7 +7,8 @@ export function getDeduplicatedOrgPath(
   departmentName?: string | null,
   teamName?: string | null,
 ): string[] {
-  const rawParts = [divisionName, departmentName, teamName]
+  // const rawParts = [divisionName, departmentName, teamName]
+  const rawParts = [teamName]
     .map((s) => s?.trim())
     .filter((s): s is string => Boolean(s));
 

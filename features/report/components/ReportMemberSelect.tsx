@@ -1,26 +1,21 @@
-import { MEMBERS } from "@/app/lib/members";
 import { formatOrgBreadcrumb } from "@/app/lib/organizationUtils";
 import type { UserOrgItem } from "@/features/report/types/report.types";
 
 type Props = {
   selectedMember: string;
-  onSelectMember: (member: string) => void;
   onOpenHistoryModal: () => void;
   memberList?: readonly string[] | string[];
   selectedMemberOrg?: UserOrgItem;
   onChangeMemberClick?: () => void;
+  onSelectMember?: (member: string) => void;
 };
 
 export default function ReportMemberSelect({
   selectedMember,
-  onSelectMember,
   onOpenHistoryModal,
-  memberList,
   selectedMemberOrg,
   onChangeMemberClick,
 }: Props) {
-  const members = memberList && memberList.length > 0 ? memberList : MEMBERS;
-
   const affiliationText = selectedMemberOrg
     ? formatOrgBreadcrumb(
         selectedMemberOrg.divisionName,
@@ -111,26 +106,6 @@ export default function ReportMemberSelect({
             <span>이전 보고 이력</span>
           </button>
         </div>
-      </div>
-
-      {/* 2. 빠른 선택 셀렉트 박스 (간단 드롭다운 백업) */}
-      <div className="flex items-center justify-between text-xs text-gray-500 px-1">
-        <span>빠른 전환 드롭다운:</span>
-        <select
-          id="member-quick-select"
-          value={selectedMember}
-          onChange={(e) => onSelectMember(e.target.value)}
-          className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 hover:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-        >
-          <option value="" disabled>
-            직접 선택
-          </option>
-          {members.map((member) => (
-            <option key={member} value={member}>
-              {member}
-            </option>
-          ))}
-        </select>
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ export default function UrgentTaskWidget({
               </span>
             </p>
             <p className="text-[11px] text-indigo-600 hidden sm:block">
-              사내 LLM이 미완료 목표 일정 및 최근 지연 업무를 백그라운드에서 분석하고 있습니다.
+              사내 LLM이 미완료 목표 일정 및 최근 지연 업무를 백그라운드에서 분석하고 있습니다 (최대 60초).
             </p>
           </div>
         </div>

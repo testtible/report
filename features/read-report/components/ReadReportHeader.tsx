@@ -30,31 +30,6 @@ export default function ReadReportHeader({
         <h1 className="text-2xl font-bold text-gray-900">일일 보고 현황</h1>
       </div>
       <div className="flex flex-wrap items-center gap-2 shrink-0">
-        {onOpenUserCommentsModal && (
-          <button
-            type="button"
-            onClick={onOpenUserCommentsModal}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
-              (pendingUserCommentCount ?? 0) > 0
-                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 ring-2 ring-blue-300"
-                : "bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700"
-            }`}
-            title="최근 5일간 팀원들이 남긴 요청 코멘트를 모아 확인합니다"
-          >
-            <span className="text-base">📬</span>
-            <span>팀원 요청 코멘트</span>
-            {(pendingUserCommentCount ?? 0) > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 text-amber-950 px-2 py-0.2 text-[10px] sm:text-[11px] font-bold shadow-2xs">
-                미확인 {pendingUserCommentCount}건
-              </span>
-            ) : (
-              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
-                확인
-              </span>
-            )}
-          </button>
-        )}
-
         <button
           type="button"
           onClick={onOpenRiskRadar}
@@ -152,6 +127,31 @@ export default function ReadReportHeader({
             사내 LLM
           </span>
         </button>
+
+        {onOpenUserCommentsModal && (
+          <button
+            type="button"
+            onClick={onOpenUserCommentsModal}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer ${
+              (pendingUserCommentCount ?? 0) > 0
+                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 ring-2 ring-blue-300"
+                : "bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700"
+            }`}
+            title="최근 5일간 팀원들이 남긴 요청 코멘트를 모아 확인합니다"
+          >
+            <span className="text-base">📬</span>
+            <span>팀원 요청 코멘트</span>
+            {(pendingUserCommentCount ?? 0) > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 text-amber-950 px-2 py-0.2 text-[10px] sm:text-[11px] font-bold shadow-2xs">
+                미확인 {pendingUserCommentCount}건
+              </span>
+            ) : (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] sm:text-[11px] font-medium text-white">
+                확인
+              </span>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

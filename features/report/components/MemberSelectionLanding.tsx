@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getDeduplicatedOrgPath } from "@/app/lib/organizationUtils";
+import PasswordModal from "@/app/components/PasswordModal";
 import type {
   OrgDivisionNode,
   UserOrgItem,
@@ -50,6 +51,10 @@ export default function MemberSelectionLanding({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDivisionFilter, setSelectedDivisionFilter] =
     useState<string>("ALL");
+  const [pendingMember, setPendingMember] = useState<{
+    name: string;
+    subtext?: string;
+  } | null>(null);
 
   // 유저가 존재하는 부문 목록 추출 (필터 탭용)
   const availableDivisions = useMemo(() => {
@@ -111,7 +116,11 @@ export default function MemberSelectionLanding({
             });
 
           if (teamUsers.length > 0) {
-            const pathParts = getDeduplicatedOrgPath(div.name, dept.name, t.name);
+            const pathParts = getDeduplicatedOrgPath(
+              div.name,
+              dept.name,
+              t.name,
+            );
             groups.push({
               teamId: t.id,
               teamName: t.name,
@@ -161,7 +170,7 @@ export default function MemberSelectionLanding({
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-700">
             <span>📋</span>
-            <span>AERIX 일일 업무 보고</span>
+            <span>일일 업무 보고</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -169,10 +178,12 @@ export default function MemberSelectionLanding({
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 max-w-xl mx-auto leading-relaxed">
-            본인의 이름을 클릭하면 일일 업무 보고서 작성 화면으로 즉시 연결됩니다.
+            본인의 이름을 클릭하면 일일 업무 보고서 작성 화면으로 즉시
+            연결됩니다.
             <br />
             <span className="text-xs text-indigo-600 font-medium">
-              💡 한 번 선택하면 브라우저에 자동 기억되어 다음 접속 시 바로 보고서가 열립니다.
+              💡 한 번 선택하면 브라우저에 자동 기억되어 다음 접속 시 바로
+              보고서가 열립니다.
             </span>
           </p>
 
@@ -199,7 +210,7 @@ export default function MemberSelectionLanding({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="이름, 부문, 부서, 팀명으로 검색 (예: 권혁재, 연구개발팀...)"
+                placeholder="이름, 팀명으로 검색 (예: 권혁재, 연구개발팀...)"
                 className="w-full pl-11 pr-10 py-3.5 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 focus:border-indigo-500 rounded-2xl text-sm sm:text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 transition-all shadow-inner"
               />
 
@@ -218,7 +229,7 @@ export default function MemberSelectionLanding({
             </div>
 
             {/* 부문별 퀵 필터 칩 */}
-            {availableDivisions.length > 0 && (
+            {/* {availableDivisions.length > 0 && (
               <div className="flex items-center justify-center gap-1.5 flex-wrap pt-3">
                 <button
                   type="button"
@@ -252,7 +263,7 @@ export default function MemberSelectionLanding({
                   );
                 })}
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -274,7 +285,8 @@ export default function MemberSelectionLanding({
               일치하는 팀원을 찾을 수 없습니다
             </p>
             <p className="text-xs text-gray-500">
-              &quot;{searchQuery}&quot; 검색어 또는 선택한 부문 필터를 다시 확인해주세요.
+              &quot;{searchQuery}&quot; 검색어 또는 선택한 부문 필터를 다시
+              확인해주세요.
             </p>
             <button
               type="button"
@@ -337,7 +349,12 @@ export default function MemberSelectionLanding({
                     <button
                       key={user.id}
                       type="button"
-                      onClick={() => onSelectMember(user.name)}
+                      onClick={() =>
+                        setPendingMember({
+                          name: user.name,
+                          subtext: group.teamName,
+                        })
+                      }
                       className={`group relative flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         isCurrent
                           ? "border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-400/30 shadow-xs"
@@ -403,7 +420,12 @@ export default function MemberSelectionLanding({
                   <button
                     key={user.id}
                     type="button"
-                    onClick={() => onSelectMember(user.name)}
+                    onClick={() =>
+                      setPendingMember({
+                        name: user.name,
+                        subtext: "소속 미지정",
+                      })
+                    }
                     className={`group relative flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                       isCurrent
                         ? "border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-400/30"
@@ -430,6 +452,23 @@ export default function MemberSelectionLanding({
             </div>
           </div>
         )}
+
+        {/* 비밀번호 확인 팝업 모달 */}
+        <PasswordModal
+          isOpen={!!pendingMember}
+          onClose={() => setPendingMember(null)}
+          onSuccess={() => {
+            if (pendingMember) {
+              const selected = pendingMember.name;
+              setPendingMember(null);
+              onSelectMember(selected);
+            }
+          }}
+          targetType="member"
+          targetName={pendingMember?.name}
+          targetSubtext={pendingMember?.subtext}
+          description={`'${pendingMember?.name}' 님의 보고서 작성 페이지로 이동하려면 비밀번호를 입력해주세요.`}
+        />
       </div>
     </div>
   );

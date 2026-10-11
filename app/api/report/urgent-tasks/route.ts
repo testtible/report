@@ -10,6 +10,7 @@ import { getAiApiUrl, getAiModel } from "@/app/lib/ai";
 import type { UrgentTaskItem } from "@/features/report/utils/deadlineParser";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 interface WeekdayInfo {
   date: string; // YYYY-MM-DD
@@ -58,14 +59,23 @@ interface RawAiTask {
   reportDate?: string;
 }
 
-/** Ollama AI 호출 (타임아웃 60초, 1회 재시도 포함 총 2회 시도) */
+/** Ollama AI 호출 (전체 최대 57초 타임아웃 보장, 잔여 시간이 충분할 경우에만 1회 재시도) */
 async function callOllamaAnalysis(
   prompt: string,
-  maxAttempts: number = 2,
 ): Promise<RawAiTask[] | null> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  const TOTAL_DEADLINE_MS = 57000; // 최대 57초 (서버 maxDuration 60초 이내 안전 응답)
+  const startTime = Date.now();
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const elapsed = Date.now() - startTime;
+    const remainingTime = TOTAL_DEADLINE_MS - elapsed;
+    if (remainingTime < 5000) {
+      // 잔여 시간이 5초 미만이면 추가 시도 중단
+      break;
+    }
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60초 타임아웃
+    const timeoutId = setTimeout(() => controller.abort(), remainingTime);
 
     try {
       const response = await fetch(getAiApiUrl(), {
@@ -90,8 +100,8 @@ async function callOllamaAnalysis(
         console.warn(
           `[UrgentTasks AI] Attempt ${attempt} failed with status: ${response.status}`,
         );
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 800));
+        if (attempt === 1 && TOTAL_DEADLINE_MS - (Date.now() - startTime) > 10000) {
+          await new Promise((r) => setTimeout(r, 600));
           continue;
         }
         return null;
@@ -99,8 +109,8 @@ async function callOllamaAnalysis(
 
       const data = (await response.json()) as { response?: string };
       if (!data.response) {
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 800));
+        if (attempt === 1 && TOTAL_DEADLINE_MS - (Date.now() - startTime) > 10000) {
+          await new Promise((r) => setTimeout(r, 600));
           continue;
         }
         return null;
@@ -131,8 +141,8 @@ async function callOllamaAnalysis(
         `[UrgentTasks AI] Attempt ${attempt} encountered error:`,
         err instanceof Error ? err.message : String(err),
       );
-      if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 800));
+      if (attempt === 1 && TOTAL_DEADLINE_MS - (Date.now() - startTime) > 10000) {
+        await new Promise((r) => setTimeout(r, 600));
         continue;
       }
     }
@@ -387,8 +397,8 @@ ${formattedReports}
   ]
 }`;
 
-    // 5. Ollama AI 백그라운드 호출 (최대 2회 시도, 실패 시 null)
-    const rawAiTasks = await callOllamaAnalysis(prompt, 2);
+    // 5. Ollama AI 백그라운드 호출 (최대 57초 타임아웃 보장, 실패 시 null)
+    const rawAiTasks = await callOllamaAnalysis(prompt);
 
     if (rawAiTasks === null) {
       return NextResponse.json({

@@ -10,6 +10,7 @@ import type {
 import type { MemberReport } from "@/app/lib/attachments";
 import { isLeaveContent } from "@/app/lib/members";
 import { getDeduplicatedOrgPath } from "@/app/lib/organizationUtils";
+import PasswordModal from "@/app/components/PasswordModal";
 
 type Props = {
   teams: TeamItem[];
@@ -55,6 +56,11 @@ export default function TeamSelectionLanding({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDivisionFilter, setSelectedDivisionFilter] =
     useState<string>("ALL");
+  const [pendingTeam, setPendingTeam] = useState<{
+    id: string;
+    name: string;
+    breadcrumb?: string;
+  } | null>(null);
 
   // 각 팀별 상세 정보 및 통계 계산
   const teamItemsWithStats = useMemo(() => {
@@ -208,7 +214,7 @@ export default function TeamSelectionLanding({
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-700">
             <span>📋</span>
-            <span>AERIX 일일 업무 보고 현황</span>
+            <span>일일 업무 보고 현황</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -216,10 +222,12 @@ export default function TeamSelectionLanding({
           </h1>
 
           <p className="text-sm sm:text-base text-gray-600 max-w-xl mx-auto leading-relaxed">
-            원하시는 팀을 클릭하면 해당 팀의 일일 업무 보고 및 AI 분석 현황을 바로 확인하실 수 있습니다.
+            원하시는 팀을 클릭하면 해당 팀의 일일 업무 보고 및 AI 분석 현황을
+            바로 확인하실 수 있습니다.
             <br />
             <span className="text-xs text-indigo-600 font-medium">
-              💡 팀별 제출 현황 및 미제출 인원을 한눈에 확인하고 피드백을 전달할 수 있습니다.
+              💡 팀별 제출 현황 및 미제출 인원을 한눈에 확인하고 피드백을 전달할
+              수 있습니다.
             </span>
           </p>
 
@@ -265,7 +273,7 @@ export default function TeamSelectionLanding({
             </div>
 
             {/* 부문별 퀵 필터 칩 */}
-            {availableDivisions.length > 0 && (
+            {/* {availableDivisions.length > 0 && (
               <div className="flex items-center justify-center gap-1.5 flex-wrap pt-3">
                 <button
                   type="button"
@@ -299,7 +307,7 @@ export default function TeamSelectionLanding({
                   );
                 })}
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -311,7 +319,8 @@ export default function TeamSelectionLanding({
               일치하는 팀을 찾을 수 없습니다
             </p>
             <p className="text-xs text-gray-500">
-              &quot;{searchQuery}&quot; 검색어 또는 선택한 부문 필터를 다시 확인해주세요.
+              &quot;{searchQuery}&quot; 검색어 또는 선택한 부문 필터를 다시
+              확인해주세요.
             </p>
             <button
               type="button"
@@ -339,7 +348,7 @@ export default function TeamSelectionLanding({
                   🏢
                 </span>
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-gray-800 truncate">
-                  {group.headerParts.map((part, idx) => (
+                  {/* {group.headerParts.map((part, idx) => (
                     <span key={idx} className="flex items-center gap-1.5">
                       {idx > 0 && <span className="text-gray-300">›</span>}
                       <span
@@ -352,7 +361,8 @@ export default function TeamSelectionLanding({
                         {part}
                       </span>
                     </span>
-                  ))}
+                  ))} */}
+                  연구개발팀
                 </div>
               </div>
 
@@ -371,7 +381,13 @@ export default function TeamSelectionLanding({
                   <button
                     key={t.teamId}
                     type="button"
-                    onClick={() => onSelectTeam(t.teamId)}
+                    onClick={() =>
+                      setPendingTeam({
+                        id: t.teamId,
+                        name: t.teamName,
+                        breadcrumb: t.breadcrumb,
+                      })
+                    }
                     className={`group relative flex flex-col justify-between p-4 rounded-xl border text-left transition-all cursor-pointer ${
                       isCurrent
                         ? "border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-400/30 shadow-xs"
@@ -437,6 +453,23 @@ export default function TeamSelectionLanding({
             </div>
           </div>
         ))}
+
+        {/* 비밀번호 확인 팝업 모달 */}
+        <PasswordModal
+          isOpen={!!pendingTeam}
+          onClose={() => setPendingTeam(null)}
+          onSuccess={() => {
+            if (pendingTeam) {
+              const teamId = pendingTeam.id;
+              setPendingTeam(null);
+              onSelectTeam(teamId);
+            }
+          }}
+          targetType="team"
+          targetName={pendingTeam?.name}
+          targetSubtext={pendingTeam?.breadcrumb}
+          description={`'${pendingTeam?.name}' 일일 보고 현황을 조회하려면 비밀번호를 입력해주세요.`}
+        />
       </div>
     </div>
   );

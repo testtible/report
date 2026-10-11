@@ -128,26 +128,46 @@ export async function fetchUrgentTasksApi(
   if (username) params.append("username", username);
   if (date) params.append("date", date);
 
-  const res = await fetch(`/api/report/urgent-tasks?${params.toString()}`);
-  const data = await res.json();
-  if (!res.ok) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 최대 60초 타임아웃
+
+  try {
+    const res = await fetch(`/api/report/urgent-tasks?${params.toString()}`, {
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        urgentTasks: [],
+        hasError: true,
+        errorMessage: data.error || "임박한 업무 조회에 실패했습니다.",
+      };
+    }
+    if (data.hasError) {
+      return {
+        urgentTasks: [],
+        hasError: true,
+        errorMessage: data.error || "사내 AI 분석에 실패했습니다.",
+      };
+    }
+    return {
+      urgentTasks: data.urgentTasks ?? [],
+      hasError: false,
+    };
+  } catch (err: unknown) {
+    const isTimeout =
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && err.name === "AbortError");
     return {
       urgentTasks: [],
       hasError: true,
-      errorMessage: data.error || "임박한 업무 조회에 실패했습니다.",
+      errorMessage: isTimeout
+        ? "AI 분석 응답 시간(최대 60초)을 초과했습니다. 다시 시도해주세요."
+        : "임박한 업무 조회 중 네트워크 오류가 발생했습니다.",
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
-  if (data.hasError) {
-    return {
-      urgentTasks: [],
-      hasError: true,
-      errorMessage: data.error || "사내 AI 분석에 실패했습니다.",
-    };
-  }
-  return {
-    urgentTasks: data.urgentTasks ?? [],
-    hasError: false,
-  };
 }
 
 export async function fetchOrganizationApi(): Promise<OrganizationResponse> {
